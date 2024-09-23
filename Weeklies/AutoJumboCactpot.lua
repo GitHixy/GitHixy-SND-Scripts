@@ -56,7 +56,7 @@ function useAethernetToJumboCactpot()
     yield('/target Aetheryte')  
     yield('/vnav movetarget')   
     yield('/vnav stop')
-    yield('/wait 1')
+    yield('/wait 0.5')
     yield('/li Cactpot Board')
     yield('/vnav reload')
     yield('/wait 8')
@@ -65,7 +65,7 @@ function useAethernetToJumboCactpot()
     yield('/wait 8')
     yield('/vnav stop')
     yield('/interact')
-    yield('/wait 1')
+    yield('/wait 0.5')
     yield('/click Talk Click')
     yield('/wait 3')
 end
@@ -75,11 +75,11 @@ end
 function purchaseAllCactpotTickets()
 
     repeat
-        yield('/wait 1')
+        yield('/wait 0.5')
     until IsAddonVisible('SelectString')
-    yield('/wait 1')
+    yield('/wait 0.5')
     yield('/callback SelectString true 0')
-    yield('/wait 1')
+    yield('/wait 0.5')
 
     -- Loop to purchase each Cactpot ticket
 
@@ -90,11 +90,11 @@ function purchaseAllCactpotTickets()
         repeat
             yield('/wait 1')
         until IsAddonVisible('LotteryWeeklyInput')
-        yield('/wait 1')
+        yield('/wait 0.5')
         yield('/callback LotteryWeeklyInput true ' .. math.random(9999))
-        yield('/wait 1')
+        yield('/wait 0.5')
         yield('/callback SelectYesno true 0')
-        yield('/wait 1')
+        yield('/wait 0.5')
     end
 
     -- Finalize and exit the dialog
