@@ -1,40 +1,78 @@
+--[[
+
+Auto Chocobo Race v1.1 by GitHixy
+Reworked logic inspired by Jaksuhn's Auto-Chocobo
+
+You can make a macro with /snd run "Your_script_name_here"
+
+]]--
+
+
+-- Declarations
+
 chocoboRaceScript = true
 zone = GetZoneID()
-GSPage = 490
+ChocoboRaceID = 21
+
+-- Helper Function (Don't Touch)
+
+function table_contains(tbl, element)
+    for _, value in pairs(tbl) do
+        if value == element then
+            return true
+        end
+    end
+    return false
+end
+
+-- Main Logic
 
 while chocoboRaceScript do
     repeat
-        zone = GetZoneID()
-    until zone == 388
-
-    repeat
         
-    yield("/wait 1")
-    OpenRegularDuty(GSPage) 
+    yield("/wait 3")
+    OpenRouletteDuty(21)  
     yield("/wait 0.5")
 
     if GetNodeListCount("ContentsFinder") > 0 then
        yield("/echo Duty Finder is ready.")
-       break  -- Break out of the loop if it's ready
+
+-- Break out of the loop if it's ready
+
+       break  
     end
 
     until false
-    
-    yield("/pcall ContentsFinder false 12 1") -- Clear Selection
+
+-- Clear Selection
+
+    yield("/pcall ContentsFinder false 12 1") 
     yield("/wait 1")
-    yield("/pcall ContentsFinder false 3 10") -- Check Chocobo Random Race
+
+-- Select Chocobo Race: Random
+
+    yield("/pcall ContentsFinder false 3 10") 
     yield("/wait 1")
     yield("/echo Random Race Selected.")
-    yield("/pcall ContentsFinder false 12 0") -- Start Duty Finder
+
+-- Start Duty Finder
+
+    yield("/pcall ContentsFinder false 12 0") 
     yield("/wait 3")
     yield("/dutyfinder")
-    yield("/dutyfinder") -- Close Duty Finder Window
+
+-- Close Duty Finder Window
+
+    yield("/dutyfinder") 
     
     
     repeat
         yield("/wait 3")
         until IsAddonReady("ContentsFinderConfirm")
-        yield("/click ContentsFinderConfirm Commence") -- Auto Commence Duty When Ready
+
+-- Auto Commence Duty When Ready
+
+        yield("/click ContentsFinderConfirm Commence") 
     
     repeat
         zone = GetZoneID()
@@ -42,28 +80,35 @@ while chocoboRaceScript do
     until zone ~= 388
 
     counter = 0
+
+-- Intervals for KEY_1
+
+    key_1_intervals = {15, 30, 45, 60, 75, 91, 105, 120, 135}  
+
     repeat
-        yield("/hold W") -- Set Key that is simulated as pressed
-        counter = counter + 1
-        if counter == 15 or
-            counter == 30 or
-            counter == 45 or
-            counter == 60 or
-            counter == 75 or
-            counter == 91 or
-            counter == 105 or
-            counter == 120 or
-            counter == 135 then
-            yield("/send KEY_1")  -- Use Skill 1
-        end
-        if counter == 90 then
-            yield("/send KEY_2") -- Use Skill 2
-        end
-        yield("/wait 1")
-    until IsAddonReady("RaceChocoboResult")
+       yield("/hold W")
+       counter = counter + 1
+
+-- Send KEY_1 at the specified intervals
+
+       if table_contains(key_1_intervals, counter) then
+          yield("/send KEY_1")
+    end
+
+-- Send KEY_2 at counter 90
+
+    if counter == 90 then
+        yield("/send KEY_2")
+    end
+
+    yield("/wait 1")
+until IsAddonReady("RaceChocoboResult")
+
+-- Show Bonus and Exit Duty
 
     yield("/wait 9")
     yield("/e Exiting from Chocobo Race!")
     yield("/pcall RaceChocoboResult true 1 0 <wait.1>")
-    yield("/release W") -- Release the Key
+    yield("/release W")
+    yield("/wait 4")
 end
