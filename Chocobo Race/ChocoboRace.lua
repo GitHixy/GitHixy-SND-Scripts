@@ -1,7 +1,9 @@
 --[[
 
-Auto Chocobo Race v1.1 by GitHixy
+Auto Chocobo Race v1.15 by GitHixy
 Reworked logic inspired by Jaksuhn's Auto-Chocobo
+
+Adjust /wait timers based on your connection and PC
 
 You can make a macro with /snd run "Your_script_name_here"
 
@@ -11,7 +13,6 @@ You can make a macro with /snd run "Your_script_name_here"
 -- Declarations
 
 chocoboRaceScript = true
-zone = GetZoneID()
 ChocoboRaceID = 21
 
 -- Helper Function (Don't Touch)
@@ -32,13 +33,10 @@ while chocoboRaceScript do
         
     yield("/wait 3")
     OpenRouletteDuty(21)  
-    yield("/wait 0.5")
+    yield("/wait 2")
 
     if GetNodeListCount("ContentsFinder") > 0 then
        yield("/echo Duty Finder is ready.")
-
--- Break out of the loop if it's ready
-
        break  
     end
 
@@ -108,7 +106,7 @@ until IsAddonReady("RaceChocoboResult")
 
     yield("/wait 9")
     yield("/e Exiting from Chocobo Race!")
-    yield("/pcall RaceChocoboResult true 1 0 <wait.1>")
     yield("/release W")
+    yield("/pcall RaceChocoboResult true 1 0 <wait.1>")
     yield("/wait 4")
 end
