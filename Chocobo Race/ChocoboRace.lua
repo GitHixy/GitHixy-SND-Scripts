@@ -12,6 +12,10 @@ Note: This script is more about convenience than competitiveness
 
 
 Happy Levelling!
+
+1.1  - Init
+1.15 - Reworked Auto Logic
+1.16 - Custom Key Added
       
 ]]--
 
@@ -20,6 +24,10 @@ Happy Levelling!
 
 chocoboRaceScript = true
 ChocoboRaceID = 21
+
+-- Player Configurations
+move_forward_key = "W"  -- Default is "W", change to your desired move forward key
+
 
 -- Helper Function (Don't Touch)
 
@@ -90,7 +98,7 @@ while chocoboRaceScript do
     key_1_intervals = {15, 30, 45, 60, 75, 91, 105, 120, 135}  
 
     repeat
-       yield("/hold W")
+       yield("/hold " .. move_forward_key)
        counter = counter + 1
 
 -- Send KEY_1 at the specified intervals
@@ -112,7 +120,7 @@ until IsAddonReady("RaceChocoboResult")
 
     yield("/wait 9")
     yield("/e Exiting from Chocobo Race!")
-    yield("/release W")
+    yield("/release " .. move_forward_key)
     yield("/pcall RaceChocoboResult true 1 0 <wait.1>")
     yield("/wait 4")
 end
