@@ -1,6 +1,6 @@
 --[[
 
-Auto Chocobo Race v1.15 by GitHixy
+Auto Chocobo Race v1.16 by GitHixy
 Reworked logic inspired by Jaksuhn's Auto-Chocobo
 
 Adjust /wait timers based on your connection and PC
@@ -46,7 +46,7 @@ while chocoboRaceScript do
     repeat
         
     yield("/wait 3")
-    OpenRouletteDuty(21)  
+    OpenRouletteDuty(ChocoboRaceID)  
     yield("/wait 2")
 
     if GetNodeListCount("ContentsFinder") > 0 then
@@ -70,7 +70,7 @@ while chocoboRaceScript do
 -- Start Duty Finder
 
     yield("/pcall ContentsFinder false 12 0") 
-    yield("/wait 3")
+    yield("/wait 1")
     yield("/dutyfinder")
 
 -- Close Duty Finder Window
