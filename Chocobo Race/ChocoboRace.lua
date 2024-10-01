@@ -7,6 +7,12 @@ Adjust /wait timers based on your connection and PC
 
 You can make a macro with /snd run "Your_script_name_here"
 
+Note: This script is more about convenience than competitiveness 
+      so don't expect first place every time!
+
+
+Happy Levelling!
+      
 ]]--
 
 
