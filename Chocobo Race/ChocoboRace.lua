@@ -1,6 +1,6 @@
 --[[
 
-Auto Chocobo Race v1.16 by GitHixy
+Auto Chocobo Race v1.17 by GitHixy
 Reworked logic inspired by Jaksuhn's Auto-Chocobo
 
 Adjust /wait timers based on your connection and PC
@@ -16,6 +16,7 @@ Happy Levelling!
 1.1  - Init
 1.15 - Reworked Auto Logic
 1.16 - Custom Key Added
+1.17 - Option to set 'Chocobo Race: Random' position on Duty Finder to be selected correctly
       
 ]]--
 
@@ -27,7 +28,7 @@ ChocoboRaceID = 21
 
 -- Player Configurations
 move_forward_key = "W"  -- Default is "W", change to your desired move forward key
-
+random_chocobo_race_position = 10  -- Default Duty Finder position for Random Chocobo Race. Players can change this.
 
 -- Helper Function (Don't Touch)
 
@@ -61,11 +62,10 @@ while chocoboRaceScript do
     yield("/pcall ContentsFinder false 12 1") 
     yield("/wait 1")
 
--- Select Chocobo Race: Random
-
-    yield("/pcall ContentsFinder false 3 10") 
-    yield("/wait 1")
-    yield("/echo Random Race Selected.")
+-- Select Chocobo Race by position
+   yield("/pcall ContentsFinder false 3 " .. random_chocobo_race_position)
+   yield("/wait 1")
+   yield("/echo Random Race Selected at position: " .. random_chocobo_race_position)
 
 -- Start Duty Finder
 
