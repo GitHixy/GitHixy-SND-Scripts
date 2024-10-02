@@ -48,6 +48,7 @@ end
 while chocoboRaceScript do
     repeat
         -- Open Roulette Duty for Chocobo Racing
+        yield("/wait 2")
         OpenRouletteDuty(ChocoboRaceID)
         
         -- Wait for ContentsFinder to be ready
@@ -56,8 +57,11 @@ while chocoboRaceScript do
         end
 
         -- Get the number of duties in the ContentsFinder
-        list = GetNodeListCount("ContentsFinder")
-        yield("/echo Total Duties: " .. list)
+        if IsAddonReady("ContentsFinder") then
+            list = GetNodeListCount("ContentsFinder")
+            yield("/echo Total Duties: " .. list)
+            yield("/wait 0.5")
+        end
 
         -- Clear previous selection
         yield("/pcall ContentsFinder true 12 1")
@@ -92,20 +96,27 @@ while chocoboRaceScript do
 
         -- Auto-commence duty
         yield("/click ContentsFinderConfirm Commence")
-        
+
         -- Wait for the zone to change
         repeat
             zone = GetZoneID()
-            yield("/wait 1")
+            yield("/wait 0.5")
         until zone ~= 388
+
+        -- Prevent reopening Duty Finder after the duty has started
+        if zone ~= 388 then
+            yield("/echo Race has started! Have fun!")
+            break
+        end
 
     until false
 
-    -- Start the Chocobo race
+    -- Start the Chocobo race logic
     counter = 0
     key_1_intervals = {15, 30, 45, 60, 75, 91, 105, 120, 135}
 
     repeat
+        -- Hold the forward key (W or custom key)
         yield("/hold " .. move_forward_key)
         counter = counter + 1
 
