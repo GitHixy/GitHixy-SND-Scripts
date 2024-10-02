@@ -1,25 +1,28 @@
 --[[
 
-Auto Chocobo Race v1.17 by GitHixy
+Auto Chocobo Race v1.18 by GitHixy
 Reworked logic inspired by Jaksuhn's Auto-Chocobo
-
-Adjust /wait timers based on your connection and PC
 
 You can make a macro with /snd run "Your_script_name_here"
 
 Note: This script is more about convenience than competitiveness 
       so don't expect first place every time!
 
-
 Happy Levelling!
 
-1.1  - Init
-1.15 - Reworked Auto Logic
-1.16 - Custom Key Added
-1.17 - Option to set 'Chocobo Race: Random' position on Duty Finder to be selected correctly
-      
-]]--
+Updates:
 
+1.18 - AutoSelect 'Chocobo Race: Random' in Duty Finder
+1.17 - Option to set 'Chocobo Race: Random' position on Duty Finder to be selected correctly
+1.16 - Custom Key Added
+1.15 - Reworked Race Logic
+1.14 - Fix Loop
+1.13 - Fix Timers
+1.12 - Race Logic
+1.11 - Bug Fixes
+1.1  - Init
+
+]]--
 
 -- Declarations
 
@@ -28,9 +31,8 @@ ChocoboRaceID = 21
 
 -- Player Configurations
 move_forward_key = "W"  -- Default is "W", change to your desired move forward key
-random_chocobo_race_position = 10  -- Default Duty Finder position for Random Chocobo Race. Players can change this.
 
--- Helper Function (Don't Touch)
+-- Helper Function
 
 function table_contains(tbl, element)
     for _, value in pairs(tbl) do
@@ -45,79 +47,80 @@ end
 
 while chocoboRaceScript do
     repeat
+        -- Open Roulette Duty for Chocobo Racing
+        OpenRouletteDuty(ChocoboRaceID)
         
-    yield("/wait 3")
-    OpenRouletteDuty(ChocoboRaceID)  
-    yield("/wait 2")
+        -- Wait for ContentsFinder to be ready
+        while not IsAddonReady("ContentsFinder") do
+            yield("/wait 0.5")
+        end
 
-    if GetNodeListCount("ContentsFinder") > 0 then
-       yield("/echo Duty Finder is ready.")
-       break  
-    end
+        -- Get the number of duties in the ContentsFinder
+        list = GetNodeListCount("ContentsFinder")
+        yield("/echo Total Duties: " .. list)
+
+        -- Clear previous selection
+        yield("/pcall ContentsFinder true 12 1")
+
+        -- Search for "Chocobo Race: Random"
+        FoundTheDuty = false
+        for i = 1, list do  -- Iterate over List duties
+            yield("/pcall ContentsFinder true 3 " .. i)
+            yield("/wait 0.1")
+            
+            if GetNodeText("ContentsFinder", 14) == "Chocobo Race: Random" then
+                FoundTheDuty = true
+                yield("/echo Random Chocobo Race selected at position " .. i)
+                break
+            end
+        end
+
+        -- Check if Random Chocobo Race was found
+        if FoundTheDuty == false then
+            yield("/echo You don't have the Duty")
+            yield("/snd stop")
+            return
+        end
+
+        -- Start Duty Finder
+        yield("/pcall ContentsFinder true 12 0")
+
+        -- Wait until Duty Finder is ready
+        while not IsAddonReady("ContentsFinderConfirm") do
+            yield("/wait 1")
+        end
+
+        -- Auto-commence duty
+        yield("/click ContentsFinderConfirm Commence")
+        
+        -- Wait for the zone to change
+        repeat
+            zone = GetZoneID()
+            yield("/wait 1")
+        until zone ~= 388
 
     until false
 
--- Clear Selection
-
-    yield("/pcall ContentsFinder false 12 1") 
-    yield("/wait 1")
-
--- Select Chocobo Race by position
-   yield("/pcall ContentsFinder false 3 " .. random_chocobo_race_position)
-   yield("/wait 1")
-   yield("/echo Random Race Selected at position: " .. random_chocobo_race_position)
-
--- Start Duty Finder
-
-    yield("/pcall ContentsFinder false 12 0") 
-    yield("/wait 1")
-    yield("/dutyfinder")
-
--- Close Duty Finder Window
-
-    yield("/dutyfinder") 
-    
-    
-    repeat
-        yield("/wait 3")
-        until IsAddonReady("ContentsFinderConfirm")
-
--- Auto Commence Duty When Ready
-
-        yield("/click ContentsFinderConfirm Commence") 
-    
-    repeat
-        zone = GetZoneID()
-        yield("/wait 1")
-    until zone ~= 388
-
+    -- Start the Chocobo race
     counter = 0
-
--- Intervals for KEY_1
-
-    key_1_intervals = {15, 30, 45, 60, 75, 91, 105, 120, 135}  
+    key_1_intervals = {15, 30, 45, 60, 75, 91, 105, 120, 135}
 
     repeat
-       yield("/hold " .. move_forward_key)
-       counter = counter + 1
+        yield("/hold " .. move_forward_key)
+        counter = counter + 1
 
--- Send KEY_1 at the specified intervals
+        if table_contains(key_1_intervals, counter) then
+            yield("/send KEY_1")
+        end
 
-       if table_contains(key_1_intervals, counter) then
-          yield("/send KEY_1")
-    end
+        if counter == 90 then
+            yield("/send KEY_2")
+        end
 
--- Send KEY_2 at counter 90
+        yield("/wait 1")
+    until IsAddonReady("RaceChocoboResult")
 
-    if counter == 90 then
-        yield("/send KEY_2")
-    end
-
-    yield("/wait 1")
-until IsAddonReady("RaceChocoboResult")
-
--- Show Bonus and Exit Duty
-
+    -- Show Bonus and Exit Duty
     yield("/wait 9")
     yield("/e Exiting from Chocobo Race!")
     yield("/release " .. move_forward_key)
