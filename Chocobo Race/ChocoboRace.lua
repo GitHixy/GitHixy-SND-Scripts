@@ -1,6 +1,6 @@
 --[[
 
-Auto Chocobo Race v1.18 by GitHixy
+Auto Chocobo Race v1.20 by GitHixy
 Reworked logic inspired by Jaksuhn's Auto-Chocobo
 
 You can make a macro with /snd run "Your_script_name_here"
@@ -12,6 +12,8 @@ Happy Levelling!
 
 Updates:
 
+1.20 - Fix to ensure rank is retrieved from the Gold Saucer tab (Bugged ATM)
+1.19 - Implemented Rank Checker and Stop Feature at Target Rank
 1.18 - AutoSelect 'Chocobo Race: Random' in Duty Finder
 1.17 - Option to set 'Chocobo Race: Random' position on Duty Finder to be selected correctly
 1.16 - Custom Key Added
@@ -29,11 +31,39 @@ Updates:
 chocoboRaceScript = true
 ChocoboRaceID = 21
 
+
 -- Player Configurations
 move_forward_key = "W"  -- Default is "W", change to your desired move forward key
+target_rank = 40  -- Default target rank is 40
 
--- Helper Function
+-- Function to ensure Gold Saucer Tab is open
+function open_gold_saucer_tab()
+    if not IsAddonReady("GoldSaucerInfo") then
+        yield("/goldsaucer")
+        yield("/wait 2")  -- Wait for the Gold Saucer tab to open
+        yield("/goldsaucer")
+    end
+end
 
+-- Get the initial rank of the Chocobo
+function get_chocobo_info()
+    open_gold_saucer_tab()  -- Ensure the Gold Saucer tab is open
+    local rank = tonumber(GetNodeText("GoldSaucerInfo", 16)) or 0
+    local name = GetNodeText("GoldSaucerInfo", 20)
+    return rank, name
+end
+
+-- Initialize the rank and echo it to the user
+current_rank, chocobo_name = get_chocobo_info()
+yield("/echo Current Chocobo '" .. chocobo_name .. "' Rank: " .. current_rank)
+
+-- Function to allow user to set target rank
+function set_target_rank(rank)
+    target_rank = tonumber(rank) or 40
+    yield("/echo Target Chocobo Rank set to: " .. target_rank)
+end
+
+-- Helper Function to check if an element is in a table
 function table_contains(tbl, element)
     for _, value in pairs(tbl) do
         if value == element then
@@ -44,13 +74,20 @@ function table_contains(tbl, element)
 end
 
 -- Main Logic
-
 while chocoboRaceScript do
     repeat
+        -- Check current rank before starting the race
+        current_rank, chocobo_name = get_chocobo_info()
+        if current_rank >= target_rank then
+            yield("/echo Chocobo '" .. chocobo_name .. "' has reached Rank " .. current_rank .. "! Stopping the script.")
+            chocoboRaceScript = false
+            return
+        end
+
         -- Open Roulette Duty for Chocobo Racing
         yield("/wait 2")
         OpenRouletteDuty(ChocoboRaceID)
-        
+
         -- Wait for ContentsFinder to be ready
         while not IsAddonReady("ContentsFinder") do
             yield("/wait 0.5")
@@ -137,4 +174,13 @@ while chocoboRaceScript do
     yield("/release " .. move_forward_key)
     yield("/pcall RaceChocoboResult true 1 0 <wait.1>")
     yield("/wait 4")
+
+    -- Check the Chocobo's rank after the race
+    current_rank, chocobo_name = get_chocobo_info()
+    yield("/echo Current Chocobo '" .. chocobo_name .. "' Rank: " .. current_rank)
+
+    if current_rank >= target_rank then
+        yield("/echo Chocobo '" .. chocobo_name .. "' has reached Rank " .. current_rank .. "! Stopping the script.")
+        chocoboRaceScript = false
+    end
 end
