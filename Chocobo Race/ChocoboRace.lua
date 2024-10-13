@@ -1,18 +1,16 @@
 --[[
 
-Auto Chocobo Race v1.20 by GitHixy
+Auto Chocobo Race v1.21 by GitHixy
 Reworked logic inspired by Jaksuhn's Auto-Chocobo
 
 You can make a macro with /snd run "Your_script_name_here"
-
-Note: This script is more about convenience than competitiveness 
-      so don't expect first place every time!
 
 Happy Levelling!
 
 Updates:
 
-1.20 - Fix to ensure rank is retrieved from the Chocobo Parameters tab (Bugged if not in the tab ATM)
+1.21 - Fix to automatically go on the Chocobo Parameters tab (Thanks to potOto for the help)
+1.20 - Fix to ensure rank is retrieved from the Chocobo Parameters tab (Bugged if not in the tab)
 1.19 - Implemented Rank Checker and Stop Feature at Target Rank
 1.18 - AutoSelect 'Chocobo Race: Random' in Duty Finder
 1.17 - Option to set 'Chocobo Race: Random' position on Duty Finder to be selected correctly
@@ -25,10 +23,8 @@ Updates:
 1.1  - Init
 
 DISCLAIMER:
-To ensure the correct functionality of this script, 
-make sure the Gold Saucer panel is open on the Chocobo Parameters tab. 
-This will allow the script to correctly retrieve your Chocobo's rank and name 
-while I work on a solution, thank you!
+This script is more about convenience than competitiveness 
+      so don't expect first place every time!
 
 ]]--
 
@@ -47,6 +43,7 @@ function open_gold_saucer_tab()
     if not IsAddonReady("GoldSaucerInfo") then
         yield("/goldsaucer")
         yield("/wait 2")  -- Wait for the Gold Saucer tab to open
+        yield("/callback GoldSaucerInfo true 0 1 119 0 0")
     end
 end
 
@@ -61,6 +58,7 @@ end
 -- Initialize the rank and echo it to the user
 current_rank, chocobo_name = get_chocobo_info()
 yield("/echo Current Chocobo '" .. chocobo_name .. "' Rank: " .. current_rank)
+yield("/goldsaucer")
 
 -- Helper Function to check if an element is in a table
 function table_contains(tbl, element)
