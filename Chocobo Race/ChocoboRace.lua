@@ -12,7 +12,7 @@ Happy Levelling!
 
 Updates:
 
-1.20 - Fix to ensure rank is retrieved from the Gold Saucer tab (Bugged ATM)
+1.20 - Fix to ensure rank is retrieved from the Chocobo Parameters tab (Bugged if not in the tab ATM)
 1.19 - Implemented Rank Checker and Stop Feature at Target Rank
 1.18 - AutoSelect 'Chocobo Race: Random' in Duty Finder
 1.17 - Option to set 'Chocobo Race: Random' position on Duty Finder to be selected correctly
@@ -23,6 +23,12 @@ Updates:
 1.12 - Race Logic
 1.11 - Bug Fixes
 1.1  - Init
+
+DISCLAIMER:
+To ensure the correct functionality of this script, 
+make sure the Gold Saucer panel is open on the Chocobo Parameters tab. 
+This will allow the script to correctly retrieve your Chocobo's rank and name 
+while I work on a solution, thank you!
 
 ]]--
 
