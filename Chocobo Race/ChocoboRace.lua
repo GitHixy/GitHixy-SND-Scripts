@@ -41,14 +41,13 @@ function open_gold_saucer_tab()
     if not IsAddonReady("GoldSaucerInfo") then
         yield("/goldsaucer")
         yield("/wait 2")  -- Wait for the Gold Saucer tab to open
-        yield("/goldsaucer")
     end
 end
 
 -- Get the initial rank of the Chocobo
 function get_chocobo_info()
     open_gold_saucer_tab()  -- Ensure the Gold Saucer tab is open
-    local rank = tonumber(GetNodeText("GoldSaucerInfo", 16)) or 0
+    local rank = tonumber(GetNodeText("GoldSaucerInfo", 16))
     local name = GetNodeText("GoldSaucerInfo", 20)
     return rank, name
 end
@@ -56,12 +55,6 @@ end
 -- Initialize the rank and echo it to the user
 current_rank, chocobo_name = get_chocobo_info()
 yield("/echo Current Chocobo '" .. chocobo_name .. "' Rank: " .. current_rank)
-
--- Function to allow user to set target rank
-function set_target_rank(rank)
-    target_rank = tonumber(rank) or 40
-    yield("/echo Target Chocobo Rank set to: " .. target_rank)
-end
 
 -- Helper Function to check if an element is in a table
 function table_contains(tbl, element)
