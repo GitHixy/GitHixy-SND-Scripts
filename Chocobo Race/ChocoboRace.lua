@@ -9,6 +9,7 @@ Happy Levelling!
 
 Updates:
 
+1.22 - Added KEY_2 pressing on counter = 10 to use Chocobo Dash ability
 1.21 - Fix to automatically go on the Chocobo Parameters tab (Thanks to potOto for the help)
 1.20 - Fix to ensure rank is retrieved from the Chocobo Parameters tab (Bugged if not in the tab)
 1.19 - Implemented Rank Checker and Stop Feature at Target Rank
@@ -158,8 +159,12 @@ while chocoboRaceScript do
             yield("/send KEY_1")
         end
 
+        if counter == 10 then
+            yield("/send KEY_2") -- Chocobo Dash Ability
+        end
+
         if counter == 90 then
-            yield("/send KEY_2")
+            yield("/send KEY_3")
         end
 
         yield("/wait 1")
