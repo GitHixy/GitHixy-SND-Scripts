@@ -80,8 +80,10 @@ end
 function path_to_gold_saucer_training_npc()
     yield("/echo Initiating pathing to Gold Saucer training NPC...")
 
-    -- Step 1: Teleport to Gold Saucer if not already there
-    if not IsInZone(144) then
+    -- Step 1: Teleport to Gold Saucer if not already in zone 144 or 388
+    zone = GetZoneID()
+
+    if zone ~= 144 and zone ~= 388 then
         Teleport("Gold Saucer")
     end
 
