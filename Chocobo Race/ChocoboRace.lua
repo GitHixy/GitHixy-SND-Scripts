@@ -23,14 +23,23 @@ Updates:
 Note:
 This script is more about convenience than competitiveness, so don't expect first place every time!
 
+Requirements:
+
+- Something Need Doing (Expanded Edition).
+- Lifestream: Use Aethernet in Gold Saucer.
+- TextAdvance: Skip Race Cutscenes and skip dialogue if Chocobo cannot be feeded anymore.
+
 ]]--
 
--- Feed Type Selection 
+-- Player Configurations 
 feed_type = "Speed"  -- Options: "Speed", "Acceleration", "Endurance", "Stamina", "Balance"
-chocoboRaceScript = true
-ChocoboRaceID = 21
 move_forward_key = "W"  -- Default is "W", change to your desired move forward key
 target_rank = 40  -- Default target rank is 40
+
+--Declarations
+chocoboRaceScript = true
+ChocoboRaceID = 21
+
 
 -- Function to ensure Gold Saucer Tab is open
 function open_gold_saucer_tab()
@@ -44,7 +53,7 @@ end
 
 -- Get the initial rank of the Chocobo and training information
 function get_chocobo_info()
-    open_gold_saucer_tab()  -- Ensure the Gold Saucer tab is open
+    open_gold_saucer_tab()
     yield("/wait 1")
     
     local rank = tonumber(GetNodeText("GoldSaucerInfo", 16)) or 0
@@ -91,7 +100,7 @@ function path_to_gold_saucer_training_npc()
     yield("/target Aetheryte")
     if not HasTarget() or GetTargetName() ~= "Aetheryte" or GetDistanceToTarget() > 7 then
         yield("/echo Moving to Aetheryte...")
-        PathfindAndMoveTo(-4.82, 1.04, 2.21)  -- Example coordinates of the Aetheryte
+        PathfindAndMoveTo(-4.82, 1.04, 2.21) 
         while PathIsRunning() or PathfindInProgress() do
             yield("/wait 1")
         end
@@ -105,7 +114,7 @@ function path_to_gold_saucer_training_npc()
     end
 
     -- Step 4: Path to the training NPC
-    PathfindAndMoveTo(-7.57, -1.78, -67.54)  -- Example coordinates of the NPC
+    PathfindAndMoveTo(-7.57, -1.78, -67.54)  
     while PathIsRunning() or PathfindInProgress() do
         yield("/wait 1")
     end
@@ -294,7 +303,7 @@ function start_chocobo_race()
     -- Get the number of duties in the ContentsFinder
     if IsAddonReady("ContentsFinder") then
         list = GetNodeListCount("ContentsFinder")
-        yield("/echo Total Duties: " .. list)
+        yield("/echo Total Duties Found: " .. list)
         yield("/wait 0.5")
     end
 
@@ -345,7 +354,7 @@ function start_chocobo_race()
 
     -- Start the Chocobo race logic
     counter = 0
-    key_1_intervals = {15, 30, 45, 60, 75, 91, 105, 120, 135}
+    key_1_intervals = {15, 20, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 91, 105, 120, 135}
 
     repeat
         -- Hold the forward key (W or custom key)
@@ -356,8 +365,8 @@ function start_chocobo_race()
             yield("/send KEY_1")
         end
 
-        if counter == 10 then
-            yield("/send KEY_2") -- Chocobo Dash Ability
+        if counter == 15 or counter == 25 then
+            yield("/send KEY_2") -- Chocobo Dash Ability (adjust counter value as needed)
         end
 
         if counter == 90 then

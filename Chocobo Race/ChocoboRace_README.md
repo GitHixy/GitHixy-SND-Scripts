@@ -18,7 +18,12 @@ This script automates Chocobo training and racing in Final Fantasy XIV, adding c
 2. Customize the script to suit your needs, including changing the move forward key, target rank, feed type, wait timers and counter.
 4. Run the script, and it will handle the rest, including teleportation to the Gold Saucer, targeting NPCs, training your Chocobo, and starting races.
 
-###Optional:  
+### Requirements:
+- Something Need Doing (Expanded Edition).
+- Lifestream: Use Aethernet in Gold Saucer.
+- TextAdvance: Skip Race Cutscenes and skip dialogue if Chocobo cannot be feeded anymore.
+
+### Optional:  
 You can create a macro in-game using: `/snd run "Your_script_name_here"`
 
 ### Script Parameters:
