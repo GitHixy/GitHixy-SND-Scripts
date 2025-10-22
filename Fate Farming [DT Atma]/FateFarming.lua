@@ -1196,6 +1196,10 @@ function SwitchToNextAtmaZone()
             yield("/echo [FATE] Now farming "..nextZone.name)
         end
         Dalamud.Log("[FATE] Zone updated to "..SelectedZone.zoneName.." (ID: "..SelectedZone.zoneId..")")
+        
+        -- Wait a bit for the zone to fully load and FATEs to populate
+        yield("/wait 2")
+        
         return true
     end
     
@@ -2758,7 +2762,7 @@ function Ready()
                     -- Current zone is complete, switch immediately
                     Dalamud.Log("[ATMA] Current zone "..atmaZone.name.." complete, switching zones from Ready()")
                     if SwitchToNextAtmaZone() then
-                        -- SwitchToNextAtmaZone already updated SelectedZone, just return
+                        -- SwitchToNextAtmaZone already updated SelectedZone, continue to select next fate
                         Dalamud.Log("[FATE] Zone switched in Ready(), SelectedZone now: "..SelectedZone.zoneName)
                     else
                         -- All zones complete
@@ -2767,7 +2771,6 @@ function Ready()
                             yield("/echo [ATMA] All Demiatma complete! Disabling atma farming.")
                         end
                     end
-                    return -- Exit and let next cycle handle the new zone
                 end
             end
         end
