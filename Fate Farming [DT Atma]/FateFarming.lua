@@ -271,7 +271,7 @@ CharacterCondition = {
 AtmaData = {
     zones = {
         { name = "Urqopacha", zoneId = 1187, itemId = 47744, itemName = "Azurite Demiatma", aetheryteName = "Wachunpelo" },
-        { name = "Kozama'uka", zoneId = 1188, itemId = 47745, itemName = "Verdigris Demiatma", aetheryteName = "Ok' Zundu" },
+        { name = "Kozama'uka", zoneId = 1188, itemId = 47745, itemName = "Verdigris Demiatma", aetheryteName = "Ok'hanu" },
         { name = "Yak T'el", zoneId = 1189, itemId = 47746, itemName = "Malachite Demiatma", aetheryteName = "Iq Br'aax" },
         { name = "Shaaloani", zoneId = 1190, itemId = 47747, itemName = "Realgar Demiatma", aetheryteName = "Hhusatahwi" },
         { name = "Heritage Found", zoneId = 1191, itemId = 47748, itemName = "Caput Mortuum Demiatma", aetheryteName = "The Outskirts" },
@@ -1190,10 +1190,10 @@ function SwitchToNextAtmaZone()
     Dalamud.Log("[ATMA] Switching to "..nextZone.name)
     
     if TeleportToAtmaZone(nextZone.aetheryteName) then
-        -- TeleportToAtmaZone already waits for completion, just update SelectedZone
+        -- TeleportToAtmaZone already waits for completion, update SelectedZone first
         SelectedZone = SelectNextZone()
         if Echo == "All" then
-            yield("/echo [FATE] Now farming "..SelectedZone.zoneName)
+            yield("/echo [FATE] Now farming "..nextZone.name)
         end
         Dalamud.Log("[FATE] Zone updated to "..SelectedZone.zoneName.." (ID: "..SelectedZone.zoneId..")")
         return true
