@@ -3638,7 +3638,7 @@ while not StopScript do
                 end
             end
         end
-        State()
+        StateMachine[State]()
     end
     yield("/wait 0.1")
 end
