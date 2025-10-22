@@ -79,18 +79,6 @@ This FATE farming script has been developed starting from pot0to's 3.0.9 logic, 
 5. **Automatic zone switching**: When you reach the target for current zone, automatically moves to the next
 6. **Completion**: When all zones are completed, continues normal FATE farming
 
-## Development Notes
-
-This script represents a significant evolution of pot0to's original version. The main modifications include:
-
-- Complete rewrite of the Atma management system
-- Native integration with Dawntrail zones
-- New helper functions for tracking and progression
-- Improvements to status visualization
-- Optimizations for SND v2 APIs
-
-The code maintains compatibility with all original features while adding a completely new layer for automatic Dawntrail Demiatma management.
-
 ---
 
 **Happy Farming! 🎮**

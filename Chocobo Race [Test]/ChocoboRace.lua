@@ -1,44 +1,196 @@
+--[=====[
+[[SND Metadata]]
+author: GitHixy
+version: 2.0.0
+description: >-
+  Auto Chocobo Train & Race script with the following features:
+
+  - Automatically trains Chocobo if training sessions are available before racing
+
+  - Purchases training food automatically based on user selection (Grade 1 only)
+
+  - Continuous training and racing until desired rank is reached
+
+  - Supports multiple feed types: Speed, Acceleration, Endurance, Stamina, and Balance
+
+  - Integrates Chocobo Dash ability during races
+
+  - Improved targeting logic for Chocobo Trainer NPC
+
+  Note: This script is more about convenience than competitiveness, so don't expect first place every time!
+
+plugin_dependencies:
+- Lifestream
+- vnavmesh
+- TextAdvance
+configs:
+  Feed Type:
+    default: "Speed"
+    description: Choose which stat to train
+    type: list
+    required: true
+    is_choice: true
+    choices:
+        - Speed
+        - Acceleration
+        - Endurance
+        - Stamina
+        - Balance
+  Move Forward Key:
+    default: "W"
+    description: Key for moving forward during the race. Change to your desired move forward key.
+    type: string
+    required: true
+  Target Rank:
+    default: 40
+    type: int
+    min: 1
+    max: 50
+    required: true
+    description: The rank your Chocobo will aim to achieve before the script stops.
+[[End Metadata]]
+--]=====]
 --[[
 
-Auto Chocobo Train & Race v1.30 by GitHixy
-Reworked logic inspired by Jaksuhn's Auto-Chocobo
+********************************************************************************
+*                                  Changelog                                   *
+********************************************************************************
 
-You can make a macro with /snd run "Your_script_name_here"
+    -> 2.0.0    By GitHixy.
+                Updated for SND v2 with full metadata support.
+                Replaced all old API calls with new SND v2 functions.
+                Converted player configurations to metadata settings.
+                Added proper SND Metadata header for plugin dependency management.
+    -> 1.30     Added functionality to automatically train Chocobo if training sessions are available before racing.
+    -> 1.29     Refactored pathing logic and improved targeting robustness for Chocobo Trainer.
+    -> 1.28     Added automatic purchasing of training food based on user selection.
+    -> 1.27     Integrated race logic and allowed for continuous training and racing.
+    -> 1.26     Fixed Chocobo rank retrieval from Gold Saucer tab (Bugged if not in Chocobo tab).
+    -> 1.25     Refined inventory selection for feed item and NPC interactions.
+    -> 1.24     Minor bug fixes and improvements to duty finder selection logic.
+    -> 1.23     Improved error handling for missing feed and failed NPC targeting.
+    -> 1.22     Added KEY_2 pressing on counter = 10 to use Chocobo Dash ability.
+    -> 1.21     Automatic handling of Chocobo parameters tab.
 
-Happy Levelling!
+********************************************************************************
+*                               Required Plugins                               *
+********************************************************************************
 
-Updates:
+Plugins that are needed for it to work:
 
-1.30 - Added functionality to automatically train Chocobo if training sessions are available before racing.
-1.29 - Refactored pathing logic and improved targeting robustness for Chocobo Trainer.
-1.28 - Added automatic purchasing of training food based on user selection.
-1.27 - Integrated race logic and allowed for continuous training and racing.
-1.26 - Fixed Chocobo rank retrieval from Gold Saucer tab (Bugged if not in Chocobo tab).
-1.25 - Refined inventory selection for feed item and NPC interactions.
-1.24 - Minor bug fixes and improvements to duty finder selection logic.
-1.23 - Improved error handling for missing feed and failed NPC targeting.
-1.22 - Added KEY_2 pressing on counter = 10 to use Chocobo Dash ability.
-1.21 - Automatic handling of Chocobo parameters tab (Thanks to potOto for the help).
+    -> Something Need Doing [Expanded Edition] : (Main Plugin for everything to work)   https://puni.sh/api/repository/croizat
+    -> VNavmesh :   (for Pathing/Moving)    https://puni.sh/api/repository/veyn
+    -> TextAdvance: (for skipping race cutscenes and dialogue) https://github.com/NightmareXIV/MyDalamudPlugins/raw/main/pluginmaster.json
+    -> Lifestream :  (for Gold Saucer Aethernet) https://raw.githubusercontent.com/NightmareXIV/MyDalamudPlugins/main/pluginmaster.json
 
-Note:
-This script is more about convenience than competitiveness, so don't expect first place every time!
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+]]
 
-Requirements:
+--[[
+********************************************************************************
+*           Code: Don't touch this unless you know what you're doing           *
+********************************************************************************
+]]
 
-- Something Need Doing (Expanded Edition).
-- Lifestream: Use Aethernet in Gold Saucer.
-- TextAdvance: Skip Race Cutscenes and skip dialogue if Chocobo cannot be feeded anymore.
+--#region Configuration
 
-]]--
-
--- Player Configurations 
-feed_type = "Speed"  -- Options: "Speed", "Acceleration", "Endurance", "Stamina", "Balance"
-move_forward_key = "W"  -- Default is "W", change to your desired move forward key
-target_rank = 40  -- Default target rank is 40
+-- Read settings from SND metadata
+local feed_type = Config.GetString("Feed Type")
+local move_forward_key = Config.GetString("Move Forward Key")
+local target_rank = Config.GetInt("Target Rank")
 
 --Declarations
 chocoboRaceScript = true
 ChocoboRaceID = 21
+
+--#endregion Configuration
+
+--#region SND v2 Helper Functions
+
+function GetCharacterCondition(index, expected)
+    if index and expected ~= nil then
+        return Svc.Condition[index] == expected
+    elseif index then
+        return Svc.Condition[index]
+    else
+        return Svc.Condition
+    end
+end
+
+function GetNodeText(addonName, ...)
+    if IsAddonReady(addonName) then
+        local node = Addons.GetAddon(addonName):GetNode(...)
+        return tostring(node.Text)
+    else
+        return ""
+    end
+end
+
+function IsAddonReady(name)
+    return Addons.GetAddon(name).Ready
+end
+
+function IsAddonVisible(name)
+    return Addons.GetAddon(name).Exists
+end
+
+function GetZoneID()
+    return Svc.ClientState.TerritoryType
+end
+
+function PathfindAndMoveTo(X, Y, Z, fly)
+    fly = (type(fly) == "boolean") and fly or false
+    local dest = Vector3(X, Y, Z)
+    IPC.vnavmesh.PathfindAndMoveTo(dest, fly)
+end
+
+function PathfindInProgress()
+    return IPC.vnavmesh.PathfindInProgress()
+end
+
+function PathIsRunning()
+    return IPC.vnavmesh.IsRunning()
+end
+
+function GetNodeListCount(addonName)
+    if IsAddonReady(addonName) then
+        return Addons.GetAddon(addonName).NodeList:Count()
+    else
+        return 0
+    end
+end
+
+function HasTarget()
+    return Entity.Target ~= nil
+end
+
+function GetTargetName()
+    if Entity.Target then
+        return Entity.Target.Name
+    else
+        return ""
+    end
+end
+
+function GetDistanceToTarget()
+    if Entity.Target then
+        return Vector3.Distance(Entity.Player.Position, Entity.Target.Position)
+    else
+        return 999
+    end
+end
+
+--#endregion SND v2 Helper Functions
+
+--#region Main Functions
+
+-- Function to open Duty Roulette
+function OpenRouletteDuty(dutyID)
+    yield("/dutyfinder")
+    yield("/wait 1")
+    yield("/pcall ContentsFinder true 1 " .. dutyID)
+    yield("/wait 0.5")
+end
 
 
 -- Function to ensure Gold Saucer Tab is open
@@ -431,5 +583,11 @@ function check_and_train_chocobo_then_race()
     start_chocobo_race()
 end
 
--- Example usage: Start the entire process
+--#endregion Main Functions
+
+--#region Script Entry Point
+
+-- Start the entire process
 check_and_train_chocobo_then_race()
+
+--#endregion Script Entry Point
