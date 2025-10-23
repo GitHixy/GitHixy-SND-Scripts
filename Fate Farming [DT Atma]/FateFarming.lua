@@ -2812,10 +2812,12 @@ function Ready()
         State = CharacterState.extractMateria
         Dalamud.Log("[FATE] State Change: ExtractMateria")
     elseif (not Dalamud.Log("[FATE] Ready -> WaitBonusBuff") and NextFate == nil and shouldWaitForBonusBuff) and DownTimeWaitAtNearestAetheryte then
+        -- When waiting for bonus buff and no fates available, go to aetheryte
         if Svc.Targets.Target == nil or GetTargetName() ~= "aetheryte" or GetDistanceToTarget() > 20 then
             State = CharacterState.flyBackToAetheryte
-            Dalamud.Log("[FATE] State Change: FlyBackToAetheryte")
+            Dalamud.Log("[FATE] State Change: FlyBackToAetheryte (bonus buff)")
         else
+            -- Already at aetheryte, just wait
             yield("/wait 10")
         end
         return
@@ -2881,10 +2883,17 @@ function Ready()
             else
                 Dalamud.Log("[FATE] Waiting for fate rewards")
             end
-        elseif (Svc.Targets.Target == nil or GetTargetName() ~= "aetheryte" or GetDistanceToTarget() > 20) and DownTimeWaitAtNearestAetheryte then
-            State = CharacterState.flyBackToAetheryte
-            Dalamud.Log("[FATE] State Change: FlyBackToAetheryte")
+        elseif DownTimeWaitAtNearestAetheryte then
+            -- Always go to aetheryte when no fates are available and DownTimeWaitAtNearestAetheryte is enabled
+            if Svc.Targets.Target == nil or GetTargetName() ~= "aetheryte" or GetDistanceToTarget() > 20 then
+                State = CharacterState.flyBackToAetheryte
+                Dalamud.Log("[FATE] State Change: FlyBackToAetheryte")
+            else
+                -- Already at aetheryte, just wait
+                yield("/wait 10")
+            end
         else
+            -- DownTimeWaitAtNearestAetheryte is disabled, just wait where we are
             if not Svc.Condition[CharacterCondition.mounted] then
                 Mount()
             end
