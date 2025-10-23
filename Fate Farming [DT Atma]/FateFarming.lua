@@ -1799,6 +1799,26 @@ function ChangeInstance()
     yield("/target aetheryte") -- search for nearby aetheryte
     if Svc.Targets.Target == nil or GetTargetName() ~= "aetheryte" then -- if no aetheryte within targeting range, teleport to it
         Dalamud.Log("[FATE] Aetheryte not within targetable range")
+        
+        -- Ensure aetheryteList is populated
+        if #SelectedZone.aetheryteList == 0 then
+            Dalamud.Log("[FATE] aetheryteList is empty in ChangeInstance, rebuilding...")
+            SelectedZone.aetheryteList = {}
+            local aetherytes = GetAetherytesInZone(SelectedZone.zoneId)
+            for _, aetheryte in ipairs(aetherytes) do
+                local aetherytePos = Instances.Telepo:GetAetherytePosition(aetheryte.AetheryteId)
+                if aetherytePos ~= nil then
+                    local aetheryteTable = {
+                        aetheryteName = GetAetheryteName(aetheryte),
+                        aetheryteId = aetheryte.AetheryteId,
+                        position = aetherytePos,
+                        aetheryteObj = aetheryte
+                    }
+                    table.insert(SelectedZone.aetheryteList, aetheryteTable)
+                end
+            end
+        end
+        
         local closestAetheryte = nil
         local closestAetheryteDistance = math.maxinteger
         for i, aetheryte in ipairs(SelectedZone.aetheryteList) do
@@ -1854,6 +1874,111 @@ function ChangeInstance()
     State = CharacterState.ready
     SuccessiveInstanceChanges = SuccessiveInstanceChanges + 1
     Dalamud.Log("[FATE] State Change: Ready")
+end
+
+function FlyBackToAetheryte()
+    -- Check if new fates have spawned
+    NextFate = SelectNextFate()
+    if NextFate ~= nil then
+        yield("/vnav stop")
+        State = CharacterState.ready
+        Dalamud.Log("[FATE] State Change: Ready (new fate found)")
+        return
+    end
+
+    -- Ensure aetheryteList is populated before using it
+    if #SelectedZone.aetheryteList == 0 then
+        Dalamud.Log("[FATE] aetheryteList is empty, rebuilding...")
+        SelectedZone.aetheryteList = {}
+        local aetherytes = GetAetherytesInZone(SelectedZone.zoneId)
+        Dalamud.Log("[FATE] Found "..tostring(#aetherytes).." aetherytes in zone")
+        for _, aetheryte in ipairs(aetherytes) do
+            local aetherytePos = Instances.Telepo:GetAetherytePosition(aetheryte.AetheryteId)
+            if aetherytePos ~= nil then
+                local aetheryteTable = {
+                    aetheryteName = GetAetheryteName(aetheryte),
+                    aetheryteId = aetheryte.AetheryteId,
+                    position = aetherytePos,
+                    aetheryteObj = aetheryte
+                }
+                table.insert(SelectedZone.aetheryteList, aetheryteTable)
+                Dalamud.Log("[FATE] Added aetheryte: "..aetheryteTable.aetheryteName)
+            end
+        end
+        Dalamud.Log("[FATE] aetheryteList now has "..tostring(#SelectedZone.aetheryteList).." aetherytes")
+    end
+
+    -- Try to target nearby aetheryte
+    yield("/target aetheryte")
+    
+    if Svc.Targets.Target == nil or GetTargetName() ~= "aetheryte" then
+        -- No aetheryte within targeting range, teleport to closest one
+        Dalamud.Log("[FATE] Aetheryte not within targetable range, finding closest")
+        local closestAetheryte = nil
+        local closestAetheryteDistance = math.maxinteger
+        
+        if #SelectedZone.aetheryteList == 0 then
+            Dalamud.Log("[FATE] ERROR: aetheryteList is still empty after rebuild!")
+            State = CharacterState.ready
+            return
+        end
+        
+        for i, aetheryte in ipairs(SelectedZone.aetheryteList) do
+            local distanceToAetheryte = GetDistanceToPoint(aetheryte.position)
+            if distanceToAetheryte < closestAetheryteDistance then
+                closestAetheryte = aetheryte
+                closestAetheryteDistance = distanceToAetheryte
+            end
+        end
+        
+        if closestAetheryte ~= nil then
+            Dalamud.Log("[FATE] Teleporting to "..closestAetheryte.aetheryteName)
+            TeleportTo(closestAetheryte.aetheryteName)
+        else
+            Dalamud.Log("[FATE] ERROR: closestAetheryte is nil!")
+        end
+        return
+    end
+
+    -- Aetheryte is targetable
+    if WaitingForFateRewards ~= nil then
+        yield("/wait 10")
+        return
+    end
+
+    if GetDistanceToTarget() > 10 then
+        Dalamud.Log("[FATE] Targeting aetheryte, but distance is "..GetDistanceToTarget())
+        if not (IPC.vnavmesh.PathfindInProgress() or IPC.vnavmesh.IsRunning()) then
+            if Svc.Condition[CharacterCondition.flying] and SelectedZone.flying then
+                yield("/vnav flytarget")
+            else
+                yield("/vnav movetarget")
+            end
+        elseif GetDistanceToTarget() > 20 and not Svc.Condition[CharacterCondition.mounted] then
+            State = CharacterState.mounting
+            Dalamud.Log("[FATE] State Change: Mounting")
+        end
+        return
+    end
+
+    -- Within 10 distance of aetheryte
+    Dalamud.Log("[FATE] Within 10 distance of aetheryte")
+    if IPC.vnavmesh.PathfindInProgress() or IPC.vnavmesh.IsRunning() then
+        yield("/vnav stop")
+        return
+    end
+
+    if Svc.Condition[CharacterCondition.mounted] then
+        Dismount()
+        return
+    end
+
+    -- Arrived at aetheryte, just wait
+    Dalamud.Log("[FATE] Arrived at aetheryte, waiting")
+    local randomWait = (math.floor(math.random()*MaxWait * 1000)/1000) + MinWait
+    yield("/wait "..randomWait)
+    State = CharacterState.ready
+    Dalamud.Log("[FATE] State Change: Ready (after aetheryte wait)")
 end
 
 function WaitForContinuation()
@@ -2912,6 +3037,26 @@ function Ready()
                 Dalamud.Log("[FATE] Waiting for fate rewards")
             end
         elseif DownTimeWaitAtNearestAetheryte then
+            -- Rebuild aetheryteList to ensure it's populated with current zone's aetherytes
+            Dalamud.Log("[FATE] Rebuilding aetheryteList for zone "..SelectedZone.zoneName)
+            SelectedZone.aetheryteList = {}
+            local aetherytes = GetAetherytesInZone(SelectedZone.zoneId)
+            Dalamud.Log("[FATE] Found "..tostring(#aetherytes).." aetherytes")
+            for _, aetheryte in ipairs(aetherytes) do
+                local aetherytePos = Instances.Telepo:GetAetherytePosition(aetheryte.AetheryteId)
+                if aetherytePos ~= nil then
+                    local aetheryteTable = {
+                        aetheryteName = GetAetheryteName(aetheryte),
+                        aetheryteId = aetheryte.AetheryteId,
+                        position = aetherytePos,
+                        aetheryteObj = aetheryte
+                    }
+                    table.insert(SelectedZone.aetheryteList, aetheryteTable)
+                    Dalamud.Log("[FATE] Added aetheryte: "..aetheryteTable.aetheryteName)
+                end
+            end
+            Dalamud.Log("[FATE] aetheryteList now has "..tostring(#SelectedZone.aetheryteList).." aetherytes")
+            
             -- Always go to aetheryte when no fates are available and DownTimeWaitAtNearestAetheryte is enabled
             Dalamud.Log("[FATE] Going to check aetheryte distance")
             if Svc.Targets.Target ~= nil then
@@ -3667,7 +3812,7 @@ while not StopScript do
                 if CheckAtmaProgress() then
                     -- Current zone complete, switch to next zone
                     if SwitchToNextAtmaZone() then
-                        -- Successfully switched zones, reset everything and return to let next cycle handle it
+                        -- Successfully switched zones, reset everything and continue main loop
                         CurrentFate = nil
                         NextFate = nil
                         DidFate = false
@@ -3675,7 +3820,7 @@ while not StopScript do
                         GemAnnouncementLock = false
                         MovingAnnouncementLock = false
                         Dalamud.Log("[FATE] Zone switch complete, resetting to Ready state")
-                        return  -- Don't call State() again, let the main loop cycle handle it
+                        -- Do NOT return here - let main loop continue normally
                     else
                         -- All atma farming complete, disable it
                         EnableAtmaFarming = false
