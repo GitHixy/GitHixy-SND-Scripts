@@ -2872,6 +2872,10 @@ function Ready()
         (not shouldWaitForBonusBuff or Inventory.GetItemCount(4868) > 0) then
         State = CharacterState.summonChocobo
     elseif not Dalamud.Log("[FATE] Ready -> NextFate nil") and NextFate == nil then
+        Dalamud.Log("[FATE] NextFate is nil - checking what to do")
+        Dalamud.Log("[FATE] EnableChangeInstance: "..tostring(EnableChangeInstance)..", GetZoneInstance: "..tostring(GetZoneInstance())..", shouldWaitForBonusBuff: "..tostring(shouldWaitForBonusBuff))
+        Dalamud.Log("[FATE] DownTimeWaitAtNearestAetheryte: "..tostring(DownTimeWaitAtNearestAetheryte))
+        
         if EnableChangeInstance and GetZoneInstance() > 0 and not shouldWaitForBonusBuff then
             State = CharacterState.changingInstances
             Dalamud.Log("[FATE] State Change: ChangingInstances")
@@ -2885,15 +2889,24 @@ function Ready()
             end
         elseif DownTimeWaitAtNearestAetheryte then
             -- Always go to aetheryte when no fates are available and DownTimeWaitAtNearestAetheryte is enabled
+            Dalamud.Log("[FATE] Going to check aetheryte distance")
+            if Svc.Targets.Target ~= nil then
+                Dalamud.Log("[FATE] Current Target: "..GetTargetName()..", Distance: "..tostring(GetDistanceToTarget()))
+            else
+                Dalamud.Log("[FATE] No target currently")
+            end
+            
             if Svc.Targets.Target == nil or GetTargetName() ~= "aetheryte" or GetDistanceToTarget() > 20 then
                 State = CharacterState.flyBackToAetheryte
                 Dalamud.Log("[FATE] State Change: FlyBackToAetheryte")
             else
                 -- Already at aetheryte, just wait
+                Dalamud.Log("[FATE] Already at aetheryte, waiting 10 seconds")
                 yield("/wait 10")
             end
         else
             -- DownTimeWaitAtNearestAetheryte is disabled, just wait where we are
+            Dalamud.Log("[FATE] DownTimeWaitAtNearestAetheryte disabled, waiting in place")
             if not Svc.Condition[CharacterCondition.mounted] then
                 Mount()
             end
