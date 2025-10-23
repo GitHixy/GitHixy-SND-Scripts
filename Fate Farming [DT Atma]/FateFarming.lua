@@ -3068,10 +3068,12 @@ function Ready()
             if Svc.Targets.Target == nil or GetTargetName() ~= "aetheryte" or GetDistanceToTarget() > 20 then
                 State = CharacterState.flyBackToAetheryte
                 Dalamud.Log("[FATE] State Change: FlyBackToAetheryte")
+                return  -- Return to let main loop call FlyBackToAetheryte
             else
                 -- Already at aetheryte, just wait
                 Dalamud.Log("[FATE] Already at aetheryte, waiting 10 seconds")
                 yield("/wait 10")
+                return  -- Return after waiting
             end
         else
             -- DownTimeWaitAtNearestAetheryte is disabled, just wait where we are
@@ -3080,8 +3082,8 @@ function Ready()
                 Mount()
             end
             yield("/wait 10")
+            return  -- Return after waiting
         end
-        return
     elseif CompanionScriptMode and DidFate and not shouldWaitForBonusBuff then
         if WaitingForFateRewards == nil then
             StopScript = true
