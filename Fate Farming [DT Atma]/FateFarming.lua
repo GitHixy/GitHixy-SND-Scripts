@@ -1587,11 +1587,14 @@ function DistanceBetween(pos1, pos2)
 end
 
 function GetDistanceToPoint(vec3)
+    if Svc.ClientState.LocalPlayer == nil or vec3 == nil then
+        return math.maxinteger
+    end
     return DistanceBetween(Svc.ClientState.LocalPlayer.Position, vec3)
 end
 
 function GetDistanceToTarget()
-    if Svc.Targets.Target ~= nil then
+    if Svc.Targets.Target ~= nil and Svc.ClientState.LocalPlayer ~= nil then
         return GetDistanceToPoint(Svc.Targets.Target.Position)
     else
         return math.maxinteger
@@ -1608,6 +1611,9 @@ function GetDistanceToTargetFlat()
 end
 
 function GetDistanceToPointFlat(vec3)
+    if Svc.ClientState.LocalPlayer == nil or vec3 == nil then
+        return math.maxinteger
+    end
     return DistanceBetweenFlat(Svc.ClientState.LocalPlayer.Position, vec3)
 end
 
@@ -1877,6 +1883,13 @@ function ChangeInstance()
 end
 
 function FlyBackToAetheryte()
+    -- Early exit if player is not available
+    if Svc.ClientState.LocalPlayer == nil then
+        Dalamud.Log("[FATE] Player not available in FlyBackToAetheryte, waiting...")
+        yield("/wait 1")
+        return
+    end
+    
     -- Check if new fates have spawned
     NextFate = SelectNextFate()
     if NextFate ~= nil then
