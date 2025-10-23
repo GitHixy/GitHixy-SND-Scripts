@@ -3190,7 +3190,30 @@ function Ready()
                 end
             end
         end
-        TeleportTo(SelectedZone.aetheryteList[1].aetheryteName)
+        
+        -- Teleport back to farming zone
+        local aetheryteName = nil
+        if EnableMultiZoneFarming and MultiZoneList and #MultiZoneList > 0 then
+            -- For Multi Zone, use the zone in the MultiZoneList
+            local currentMultiZone = MultiZoneList[CurrentMultiZoneIndex]
+            if currentMultiZone then
+                aetheryteName = currentMultiZone.aetheryteName
+                Dalamud.Log("[MULTI-ZONE] Returning to "..currentMultiZone.name.." via "..aetheryteName)
+            end
+        end
+        
+        -- Fallback to aetheryteList
+        if aetheryteName == nil and SelectedZone.aetheryteList and #SelectedZone.aetheryteList > 0 then
+            aetheryteName = SelectedZone.aetheryteList[1].aetheryteName
+            Dalamud.Log("[FATE] Returning to "..SelectedZone.zoneName.." via "..aetheryteName)
+        end
+        
+        if aetheryteName ~= nil then
+            TeleportTo(aetheryteName)
+        else
+            Dalamud.Log("[FATE] ERROR: No aetheryte found to return to farming zone!")
+            StopScript = true
+        end
         return
     elseif ShouldSummonChocobo and GetBuddyTimeRemaining() <= ResummonChocoboTimeLeft and
         (not shouldWaitForBonusBuff or Inventory.GetItemCount(4868) > 0) then
