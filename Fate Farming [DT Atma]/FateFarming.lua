@@ -1661,6 +1661,14 @@ function ForceTeleportToNearestAetheryte()
         return false
     end
 
+    -- Special handling for atma zones
+    local atmaZone = GetAtmaZoneData(SelectedZone.zoneId)
+    if atmaZone ~= nil then
+        Dalamud.Log("[FATE] Force teleport to atma aetheryte: "..atmaZone.aetheryteName)
+        TeleportTo(atmaZone.aetheryteName)
+        return true
+    end
+
     if SelectedZone.aetheryteList == nil or #SelectedZone.aetheryteList == 0 then
         Dalamud.Log("[FATE] Force teleport rebuilding aetheryteList")
         SelectedZone = SelectNextZone()
@@ -1938,6 +1946,14 @@ function FlyBackToAetheryte()
         yield("/vnav stop")
         State = CharacterState.ready
         Dalamud.Log("[FATE] State Change: Ready (new fate found)")
+        return
+    end
+
+    -- Special handling for atma zones
+    local atmaZone = GetAtmaZoneData(SelectedZone.zoneId)
+    if atmaZone ~= nil then
+        Dalamud.Log("[FATE] Atma zone detected, teleporting to "..atmaZone.aetheryteName)
+        TeleportTo(atmaZone.aetheryteName)
         return
     end
 
