@@ -3453,7 +3453,7 @@ if ItemToPurchase == "" or ItemToPurchase == nil then
     ShouldExchangeBicolorGemstones = false
 end
 SelfRepair = Config.Get("Self repair?")
-RemainingDurabilityToRepair     = 10            --the amount it needs to drop before Repairing (set it to 0 if you don't want it to repair)
+RemainingDurabilityToRepair     = 50            --the amount it needs to drop before Repairing (set it to 0 if you don't want it to repair)
 ShouldAutoBuyDarkMatter         = true          --Automatically buys a 99 stack of Grade 8 Dark Matter from the Limsa gil vendor if you're out
 ShouldExtractMateria                = true          --should it Extract Materia
 Retainers = Config.Get("Pause for retainers?")
