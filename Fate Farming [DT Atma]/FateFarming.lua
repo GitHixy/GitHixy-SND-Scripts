@@ -3022,16 +3022,20 @@ function Ready()
         Dalamud.Log("[FATE] NextFate is "..NextFate.fateName)
     end
 
-    if not Dalamud.Log("[FATE] Ready -> Player.Available") and not Player.Available then
+    if not Player.Available then
+        Dalamud.Log("[FATE] Ready -> Player.Available")
         return
-    elseif not Dalamud.Log("[FATE] Ready -> Repair") and RemainingDurabilityToRepair > 0 and needsRepair.Count > 0 and
+    elseif RemainingDurabilityToRepair > 0 and needsRepair.Count > 0 and
         (not shouldWaitForBonusBuff or (SelfRepair and Inventory.GetItemCount(33916) > 0)) then
+        Dalamud.Log("[FATE] Ready -> Repair")
         State = CharacterState.repair
         Dalamud.Log("[FATE] State Change: Repair")
-    elseif not Dalamud.Log("[FATE] Ready -> ExtractMateria") and ShouldExtractMateria and spiritbonded.Count > 0 and Inventory.GetFreeInventorySlots() > 1 then
+    elseif ShouldExtractMateria and spiritbonded.Count > 0 and Inventory.GetFreeInventorySlots() > 1 then
+        Dalamud.Log("[FATE] Ready -> ExtractMateria")
         State = CharacterState.extractMateria
         Dalamud.Log("[FATE] State Change: ExtractMateria")
-    elseif (not Dalamud.Log("[FATE] Ready -> WaitBonusBuff") and NextFate == nil and shouldWaitForBonusBuff) and DownTimeWaitAtNearestAetheryte then
+    elseif NextFate == nil and shouldWaitForBonusBuff and DownTimeWaitAtNearestAetheryte then
+        Dalamud.Log("[FATE] Ready -> WaitBonusBuff")
         -- When waiting for bonus buff and no fates available, go to aetheryte
         if Svc.Targets.Target == nil or GetTargetName() ~= "aetheryte" or GetDistanceToTarget() > 20 then
             State = CharacterState.flyBackToAetheryte
@@ -3041,23 +3045,22 @@ function Ready()
             yield("/wait 10")
         end
         return
-    elseif not Dalamud.Log("[FATE] Ready -> ExchangingVouchers") and
-        ShouldExchangeBicolorGemstones and (BicolorGemCount >= 1400) and not shouldWaitForBonusBuff
-    then
+    elseif ShouldExchangeBicolorGemstones and (BicolorGemCount >= 1400) and not shouldWaitForBonusBuff then
+        Dalamud.Log("[FATE] Ready -> ExchangingVouchers")
         if WaitingForFateRewards == nil then
             State = CharacterState.exchangingVouchers
             Dalamud.Log("[FATE] State Change: ExchangingVouchers")
         else
             Dalamud.Log("[FATE] Waiting for fate rewards: "..WaitingForFateRewards.fateId)
         end
-    elseif not Dalamud.Log("[FATE] Ready -> ProcessRetainers") and WaitingForFateRewards == nil and
-        Retainers and ARRetainersWaitingToBeProcessed() and Inventory.GetFreeInventorySlots() > 1  and not shouldWaitForBonusBuff
-    then
+    elseif WaitingForFateRewards == nil and
+        Retainers and ARRetainersWaitingToBeProcessed() and Inventory.GetFreeInventorySlots() > 1  and not shouldWaitForBonusBuff then
+        Dalamud.Log("[FATE] Ready -> ProcessRetainers")
         State = CharacterState.processRetainers
         Dalamud.Log("[FATE] State Change: ProcessingRetainers")
-    elseif not Dalamud.Log("[FATE] Ready -> GC TurnIn") and ShouldGrandCompanyTurnIn and
-        Inventory.GetFreeInventorySlots() < InventorySlotsLeft and not shouldWaitForBonusBuff
-    then
+    elseif ShouldGrandCompanyTurnIn and
+        Inventory.GetFreeInventorySlots() < InventorySlotsLeft and not shouldWaitForBonusBuff then
+        Dalamud.Log("[FATE] Ready -> GC TurnIn")
         State = CharacterState.gcTurnIn
         Dalamud.Log("[FATE] State Change: GCTurnIn")
     elseif NextFate == nil and DownTimeWaitAtNearestAetheryte then
@@ -3071,7 +3074,8 @@ function Ready()
             yield("/wait 10")
         end
         return
-    elseif not Dalamud.Log("[FATE] Ready -> TeleportBackToFarmingZone") and Svc.ClientState.TerritoryType ~=  SelectedZone.zoneId then
+    elseif Svc.ClientState.TerritoryType ~=  SelectedZone.zoneId then
+        Dalamud.Log("[FATE] Ready -> TeleportBackToFarmingZone")
         -- If atma farming is enabled, verify SelectedZone is still the right zone
         if EnableAtmaFarming then
             local selectedAtmaZone = GetAtmaZoneData(SelectedZone.zoneId)
@@ -3099,10 +3103,12 @@ function Ready()
         end
         TeleportTo(SelectedZone.aetheryteList[1].aetheryteName)
         return
-    elseif not Dalamud.Log("[FATE] Ready -> SummonChocobo") and ShouldSummonChocobo and GetBuddyTimeRemaining() <= ResummonChocoboTimeLeft and
+    elseif ShouldSummonChocobo and GetBuddyTimeRemaining() <= ResummonChocoboTimeLeft and
         (not shouldWaitForBonusBuff or Inventory.GetItemCount(4868) > 0) then
+        Dalamud.Log("[FATE] Ready -> SummonChocobo")
         State = CharacterState.summonChocobo
-    elseif not Dalamud.Log("[FATE] Ready -> NextFate nil") and NextFate == nil then
+    elseif NextFate == nil then
+        Dalamud.Log("[FATE] Ready -> NextFate nil")
         Dalamud.Log("[FATE] NextFate is nil - checking what to do")
         Dalamud.Log("[FATE] EnableChangeInstance: "..tostring(EnableChangeInstance)..", GetZoneInstance: "..tostring(GetZoneInstance())..", shouldWaitForBonusBuff: "..tostring(shouldWaitForBonusBuff))
         Dalamud.Log("[FATE] DownTimeWaitAtNearestAetheryte: "..tostring(DownTimeWaitAtNearestAetheryte))
