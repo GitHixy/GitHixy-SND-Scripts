@@ -1655,6 +1655,45 @@ function GetAetheryteName(aetheryte)
     end
 end
 
+function ForceTeleportToNearestAetheryte()
+    if SelectedZone == nil then
+        Dalamud.Log("[FATE] Force teleport failed: SelectedZone is nil")
+        return false
+    end
+
+    if SelectedZone.aetheryteList == nil or #SelectedZone.aetheryteList == 0 then
+        Dalamud.Log("[FATE] Force teleport rebuilding aetheryteList")
+        SelectedZone = SelectNextZone()
+        if SelectedZone == nil or SelectedZone.aetheryteList == nil or #SelectedZone.aetheryteList == 0 then
+            Dalamud.Log("[FATE] Force teleport failed: no aetherytes available")
+            return false
+        end
+    end
+
+    local targetAetheryte = SelectedZone.aetheryteList[1]
+    if Svc.ClientState.LocalPlayer ~= nil then
+        local closestDistance = math.maxinteger
+        for _, aetheryte in ipairs(SelectedZone.aetheryteList) do
+            if aetheryte.position ~= nil then
+                local distance = GetDistanceToPoint(aetheryte.position)
+                if distance < closestDistance then
+                    closestDistance = distance
+                    targetAetheryte = aetheryte
+                end
+            end
+        end
+    end
+
+    if targetAetheryte == nil or targetAetheryte.aetheryteName == nil then
+        Dalamud.Log("[FATE] Force teleport failed: targetAetheryte invalid")
+        return false
+    end
+
+    Dalamud.Log("[FATE] Force teleporting to "..targetAetheryte.aetheryteName)
+    TeleportTo(targetAetheryte.aetheryteName)
+    return true
+end
+
 function DistanceFromClosestAetheryteToPoint(vec3, teleportTimePenalty)
     local closestAetheryte = nil
     local closestTravelDistance = math.maxinteger
@@ -1892,6 +1931,9 @@ function FlyBackToAetheryte()
     
     -- Check if new fates have spawned
     NextFate = SelectNextFate()
+    if NextFate ~= nil then
+        NoEligibleFateCount = 0
+    end
     if NextFate ~= nil then
         yield("/vnav stop")
         State = CharacterState.ready
@@ -3037,6 +3079,16 @@ function Ready()
         Dalamud.Log("[FATE] NextFate is nil - checking what to do")
         Dalamud.Log("[FATE] EnableChangeInstance: "..tostring(EnableChangeInstance)..", GetZoneInstance: "..tostring(GetZoneInstance())..", shouldWaitForBonusBuff: "..tostring(shouldWaitForBonusBuff))
         Dalamud.Log("[FATE] DownTimeWaitAtNearestAetheryte: "..tostring(DownTimeWaitAtNearestAetheryte))
+        NoEligibleFateCount = (NoEligibleFateCount or 0) + 1
+        Dalamud.Log("[FATE] No eligible fate streak count: "..tostring(NoEligibleFateCount))
+
+        if NoEligibleFateCount >= 10 then
+            Dalamud.Log("[FATE] No eligible fates for "..tostring(NoEligibleFateCount).." checks, forcing teleport to nearest aetheryte")
+            if ForceTeleportToNearestAetheryte() then
+                NoEligibleFateCount = 0
+                return
+            end
+        end
         
         if EnableChangeInstance and GetZoneInstance() > 0 and not shouldWaitForBonusBuff then
             State = CharacterState.changingInstances
@@ -3081,11 +3133,13 @@ function Ready()
             if Svc.Targets.Target == nil or GetTargetName() ~= "aetheryte" or GetDistanceToTarget() > 20 then
                 State = CharacterState.flyBackToAetheryte
                 Dalamud.Log("[FATE] State Change: FlyBackToAetheryte")
+                NoEligibleFateCount = 0
                 return  -- Return to let main loop call FlyBackToAetheryte
             else
                 -- Already at aetheryte, just wait
                 Dalamud.Log("[FATE] Already at aetheryte, waiting 10 seconds")
                 yield("/wait 10")
+                NoEligibleFateCount = 0
                 return  -- Return after waiting
             end
         else
@@ -3694,6 +3748,7 @@ WaitingForFateRewards = nil
 LastFateEndTime = os.clock()
 LastStuckCheckTime = os.clock()
 LastStuckCheckPosition = Player.Entity.Position
+NoEligibleFateCount = 0
 MainClass = Player.Job
 BossFatesClass = nil
 if ClassForBossFates ~= "" then
