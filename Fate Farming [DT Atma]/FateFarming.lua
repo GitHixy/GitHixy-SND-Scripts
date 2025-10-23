@@ -1367,16 +1367,23 @@ function SelectNextZone()
     nextZone.zoneName = nextZone.zoneName
     nextZone.aetheryteList = {}
     local aetherytes = GetAetherytesInZone(nextZone.zoneId)
+    Dalamud.Log("[FATE] SelectNextZone: Found "..tostring(#aetherytes).." aetherytes for zone "..tostring(nextZone.zoneId))
     for _, aetheryte in ipairs(aetherytes) do
         local aetherytePos = Instances.Telepo:GetAetherytePosition(aetheryte.AetheryteId)
-        local aetheryteTable = {
-            aetheryteName = GetAetheryteName(aetheryte),
-            aetheryteId = aetheryte.AetheryteId,
-            position = aetherytePos,
-            aetheryteObj = aetheryte
-        }
-        table.insert(nextZone.aetheryteList, aetheryteTable)
+        if aetherytePos ~= nil then
+            local aetheryteTable = {
+                aetheryteName = GetAetheryteName(aetheryte),
+                aetheryteId = aetheryte.AetheryteId,
+                position = aetherytePos,
+                aetheryteObj = aetheryte
+            }
+            table.insert(nextZone.aetheryteList, aetheryteTable)
+            Dalamud.Log("[FATE] Added aetheryte: "..aetheryteTable.aetheryteName.." at position "..tostring(aetherytePos))
+        else
+            Dalamud.Log("[FATE] WARNING: Failed to get position for aetheryte ID "..tostring(aetheryte.AetheryteId))
+        end
     end
+    Dalamud.Log("[FATE] SelectNextZone: Built aetheryteList with "..tostring(#nextZone.aetheryteList).." aetherytes")
 
     if nextZone.flying == nil then
         nextZone.flying = true
@@ -1895,9 +1902,26 @@ function FlyBackToAetheryte()
 
     local closestAetheryte = GetClosestAetheryte(Svc.ClientState.LocalPlayer.Position, 0)
     if closestAetheryte == nil then
-        DownTimeWaitAtNearestAetheryte = false
-        yield("/echo Could not find aetheryte in the area. Turning off feature to fly back to aetheryte.")
-        return
+        Dalamud.Log("[FATE] WARNING: GetClosestAetheryte returned nil!")
+        Dalamud.Log("[FATE] SelectedZone.aetheryteList has "..tostring(#SelectedZone.aetheryteList).." aetherytes")
+        if #SelectedZone.aetheryteList == 0 then
+            yield("/echo No aetheryte data loaded for this zone. Rebuilding zone data...")
+            SelectedZone = SelectNextZone()
+            closestAetheryte = GetClosestAetheryte(Svc.ClientState.LocalPlayer.Position, 0)
+            if closestAetheryte == nil then
+                DownTimeWaitAtNearestAetheryte = false
+                yield("/echo Could not find aetheryte in the area. Turning off feature to fly back to aetheryte.")
+                State = CharacterState.ready
+                Dalamud.Log("[FATE] State Change: Ready")
+                return
+            end
+        else
+            DownTimeWaitAtNearestAetheryte = false
+            yield("/echo Could not find aetheryte in the area. Turning off feature to fly back to aetheryte.")
+            State = CharacterState.ready
+            Dalamud.Log("[FATE] State Change: Ready")
+            return
+        end
     end
     -- if you get any sort of error while flying back, then just abort and tp back
     if Addons.GetAddon("_TextError").Ready and GetNodeText("_TextError", 1) == "Your mount can fly no higher." then
