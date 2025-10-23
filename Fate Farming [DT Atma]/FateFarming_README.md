@@ -1,13 +1,19 @@
 # Fate Farming Script with Dawntrail Demiatma Integration
 
-## Version: 3.1.0
+## Version: 3.2.0
 ### Author: GitHixy (based on pot0to's 3.0.9)
 
 This FATE farming script has been developed starting from pot0to's 3.0.9 logic, with significant improvements and complete integration of automatic Dawntrail Demiatma farming.
 
 ## Main Features
 
-### 🔥 New in v3.1.0 - Dawntrail Demiatma Integration
+### 🔥 New in v3.2.0 - Multi Zone Farming
+- **Multi Zone Farming mode**: Automatically cycles through configured zones when no eligible FATEs found
+- **Zone list customization**: Configure which zones to cycle through (comma-separated list)
+- **Mutual exclusivity**: Atma and Multi Zone modes are mutually exclusive for clarity
+- **Improved navigation**: Enhanced aetheryte navigation logic with better fallback handling
+
+### 🎯 New in v3.1.0 - Dawntrail Demiatma Integration
 - **Automatic Demiatma farming**: Fully integrated system for farming all 6 Dawntrail Demiatma
 - **Automatic zone switching**: Script automatically changes zones when reaching target Demiatma count
 - **Progress visualization**: Atma progress displayed in status messages (gem count, moving to fate)
@@ -33,8 +39,14 @@ This FATE farming script has been developed starting from pot0to's 3.0.9 logic, 
 - **Auto purchasing**: Automatically buys gysahl greens and grade 8 dark matter when you run out
 
 ### 🛠 Available Configurations
-- **Enable Atma Farming**: Enable/disable automatic Demiatma farming
+
+#### Farming Modes (Mutually Exclusive)
+- **Enable Atma Farming**: Enable/disable automatic Demiatma farming. When enabled, script farms specific Demiatma count per zone.
 - **Target Atma per Zone**: Number of Demiatma to farm per zone before moving to next (default: 3)
+- **Enable Multi Zone Farming**: Enable/disable automatic zone cycling when no FATEs found. When enabled, immediately switches to next zone.
+- **Multi Zone List**: Comma-separated list of zones to cycle through (default: all 6 DT zones)
+
+#### General Settings
 - **Food/Potion**: Food and potion configuration (supports HQ with `<hq>` tag)
 - **Chocobo Companion**: Chocobo companion stance (Follow, Free, Defender, Healer, Attacker, None)
 - **FATE filters**: Progress percentages and minimum duration to ignore FATEs

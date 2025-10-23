@@ -164,7 +164,7 @@ configs:
   Enable Atma Farming?:
     default: false
     type: boolean
-    description: Enable automatic Dawntrail Demiatma farming. Will check atma counts after each FATE and switch zones when needed.
+    description: Enable automatic Dawntrail Demiatma farming. Will check atma counts after each FATE and switch zones when needed. Mutually exclusive with Multi Zone Farming.
   Target Atma per Zone:
     default: 3
     type: int
@@ -172,6 +172,14 @@ configs:
     max: 99
     required: true
     description: How many of each Demiatma to farm per zone before moving to the next zone.
+  Enable Multi Zone Farming?:
+    default: false
+    type: boolean
+    description: Enable automatic zone switching when no eligible FATEs are found. Will cycle through configured zones. Mutually exclusive with Atma Farming.
+  Multi Zone List:
+    default: "Urqopacha,Kozama'uka,Yak T'el,Shaaloani,Heritage Found,Living Memory"
+    type: string
+    description: Comma-separated list of zone names to cycle through. Leave empty to use all DT zones.
 [[End Metadata]]
 --]=====]
 --[[
@@ -180,6 +188,12 @@ configs:
 *                                  Changelog                                   *
 ********************************************************************************
 
+    -> 3.2.0    By GitHixy.
+                Added Multi Zone Farming mode: automatically cycles through zones when no eligible FATEs found.
+                New metadata options: "Enable Multi Zone Farming?" and "Multi Zone List".
+                Mutual exclusivity: Atma Farming and Multi Zone Farming cannot be enabled simultaneously.
+                Improved aetheryte navigation logic inspired by baanderson's implementation.
+                Fixed broken condition checks in Ready() that prevented aetheryte navigation.
     -> 3.1.0    By GitHixy.
                 Integrated Dawntrail Demiatma farming directly into the main script.
                 Added automatic zone switching when target Demiatma count is reached.
@@ -1258,6 +1272,81 @@ function GetAtmaStatusMessage()
     end
 end
 --#endregion Atma Functions
+
+--#region Multi Zone Functions
+MultiZoneList = {}
+CurrentMultiZoneIndex = 1
+
+function InitializeMultiZoneList()
+    MultiZoneList = {}
+    local zoneListString = Config.Get("Multi Zone List") or ""
+    
+    -- If empty or default, use all DT zones
+    if zoneListString == "" or zoneListString == "Urqopacha,Kozama'uka,Yak T'el,Shaaloani,Heritage Found,Living Memory" then
+        for _, zone in ipairs(AtmaData.zones) do
+            table.insert(MultiZoneList, {
+                name = zone.name,
+                zoneId = zone.zoneId,
+                aetheryteName = zone.aetheryteName
+            })
+        end
+    else
+        -- Parse user-provided comma-separated list
+        for zoneName in string.gmatch(zoneListString, "([^,]+)") do
+            zoneName = zoneName:match("^%s*(.-)%s*$") -- trim whitespace
+            -- Find zone in AtmaData
+            for _, zone in ipairs(AtmaData.zones) do
+                if zone.name == zoneName then
+                    table.insert(MultiZoneList, {
+                        name = zone.name,
+                        zoneId = zone.zoneId,
+                        aetheryteName = zone.aetheryteName
+                    })
+                    break
+                end
+            end
+        end
+    end
+    
+    -- Find current zone index
+    local currentZone = Svc.ClientState.TerritoryType
+    for i, zone in ipairs(MultiZoneList) do
+        if zone.zoneId == currentZone then
+            CurrentMultiZoneIndex = i
+            break
+        end
+    end
+    
+    Dalamud.Log("[MULTI-ZONE] Initialized with "..tostring(#MultiZoneList).." zones, starting at index "..tostring(CurrentMultiZoneIndex))
+end
+
+function GetNextMultiZone()
+    if #MultiZoneList == 0 then
+        return nil
+    end
+    
+    CurrentMultiZoneIndex = (CurrentMultiZoneIndex % #MultiZoneList) + 1
+    return MultiZoneList[CurrentMultiZoneIndex]
+end
+
+function SwitchToNextMultiZone()
+    local nextZone = GetNextMultiZone()
+    if not nextZone then
+        Dalamud.Log("[MULTI-ZONE] ERROR: No zones in MultiZoneList")
+        return false
+    end
+    
+    Dalamud.Log("[MULTI-ZONE] Switching to "..nextZone.name)
+    if Echo == "All" then
+        yield("/echo [MULTI-ZONE] Switching to "..nextZone.name)
+    end
+    
+    TeleportTo(nextZone.aetheryteName)
+    SelectedZone = SelectNextZone()
+    
+    return true
+end
+--#endregion Multi Zone Functions
 
 --#region Fate Functions
 function IsCollectionsFate(fateName)
@@ -3115,6 +3204,15 @@ function Ready()
         NoEligibleFateCount = (NoEligibleFateCount or 0) + 1
         Dalamud.Log("[FATE] No eligible fate streak count: "..tostring(NoEligibleFateCount))
 
+        -- Multi Zone Farming: switch zone when no fates
+        if EnableMultiZoneFarming and not shouldWaitForBonusBuff then
+            Dalamud.Log("[MULTI-ZONE] No eligible fates, switching to next zone")
+            if SwitchToNextMultiZone() then
+                NoEligibleFateCount = 0
+                return
+            end
+        end
+        
         if NoEligibleFateCount >= 10 then
             Dalamud.Log("[FATE] No eligible fates for "..tostring(NoEligibleFateCount).." checks, forcing teleport to nearest aetheryte")
             if ForceTeleportToNearestAetheryte() then
@@ -3718,6 +3816,25 @@ if TargetAtmaPerZone == nil or TargetAtmaPerZone < 1 then
     TargetAtmaPerZone = 3  -- Default fallback
 end
 
+-- Multi Zone Farming Settings
+EnableMultiZoneFarming = Config.Get("Enable Multi Zone Farming?")
+
+-- Mutual exclusivity: disable one if both are enabled
+if EnableAtmaFarming and EnableMultiZoneFarming then
+    Dalamud.Log("[CONFIG] WARNING: Both Atma Farming and Multi Zone Farming are enabled. Atma Farming takes priority.")
+    if Echo == "All" then
+        yield("/echo [CONFIG] WARNING: Both Atma and Multi Zone Farming enabled. Using Atma mode.")
+    end
+    EnableMultiZoneFarming = false
+elseif EnableMultiZoneFarming then
+    Dalamud.Log("[MULTI-ZONE] Multi Zone Farming enabled")
+    InitializeMultiZoneList()
+    if #MultiZoneList == 0 then
+        Dalamud.Log("[MULTI-ZONE] ERROR: No valid zones in Multi Zone List. Disabling Multi Zone Farming.")
+        EnableMultiZoneFarming = false
+    end
+end
+
 CompanionScriptMode = false  -- Set to false since Atma farming is now integrated (was true for external companion scripts)
 
 -- Get user-configured plugin
@@ -3871,6 +3988,21 @@ end
 
 if ShouldSummonChocobo and GetBuddyTimeRemaining() > 0 then
     yield('/cac "'..ChocoboStance..' stance"')
+end
+
+-- Log active farming mode
+if EnableAtmaFarming then
+    Dalamud.Log("[FATE] Atma Farming Mode: ACTIVE")
+    if Echo == "All" then
+        yield("/echo [FATE] Atma Farming Mode: Enabled")
+    end
+elseif EnableMultiZoneFarming then
+    Dalamud.Log("[FATE] Multi Zone Farming Mode: ACTIVE ("..tostring(#MultiZoneList).." zones)")
+    if Echo == "All" then
+        yield("/echo [FATE] Multi Zone Farming Mode: Enabled with "..tostring(#MultiZoneList).." zones")
+    end
+else
+    Dalamud.Log("[FATE] Standard Single Zone Farming Mode")
 end
 
 while not StopScript do
