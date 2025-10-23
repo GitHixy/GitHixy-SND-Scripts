@@ -3060,12 +3060,14 @@ function Ready()
     then
         State = CharacterState.gcTurnIn
         Dalamud.Log("[FATE] State Change: GCTurnIn")
-    elseif not Dalamud.Log("[FATE] Ready -> FlyBackToAetheryte") and NextFate == nil and DownTimeWaitAtNearestAetheryte then
+    elseif NextFate == nil and DownTimeWaitAtNearestAetheryte then
+        Dalamud.Log("[FATE] Ready -> FlyBackToAetheryte check")
         if Svc.Targets.Target == nil or GetTargetName() ~= "aetheryte" or GetDistanceToTarget() > 20 then
             State = CharacterState.flyBackToAetheryte
             Dalamud.Log("[FATE] State Change: FlyBackToAetheryte (no fates)")
         else
             -- Already at aetheryte, just wait
+            Dalamud.Log("[FATE] Already at aetheryte, waiting...")
             yield("/wait 10")
         end
         return
