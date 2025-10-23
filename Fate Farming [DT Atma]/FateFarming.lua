@@ -3044,6 +3044,15 @@ function Ready()
     then
         State = CharacterState.gcTurnIn
         Dalamud.Log("[FATE] State Change: GCTurnIn")
+    elseif not Dalamud.Log("[FATE] Ready -> FlyBackToAetheryte") and NextFate == nil and DownTimeWaitAtNearestAetheryte then
+        if Svc.Targets.Target == nil or GetTargetName() ~= "aetheryte" or GetDistanceToTarget() > 20 then
+            State = CharacterState.flyBackToAetheryte
+            Dalamud.Log("[FATE] State Change: FlyBackToAetheryte (no fates)")
+        else
+            -- Already at aetheryte, just wait
+            yield("/wait 10")
+        end
+        return
     elseif not Dalamud.Log("[FATE] Ready -> TeleportBackToFarmingZone") and Svc.ClientState.TerritoryType ~=  SelectedZone.zoneId then
         -- If atma farming is enabled, verify SelectedZone is still the right zone
         if EnableAtmaFarming then
