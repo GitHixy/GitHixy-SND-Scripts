@@ -3477,6 +3477,27 @@ function ProcessRetainers()
         if Addons.GetAddon("RetainerList").Ready then
             yield("/callback RetainerList true -1")
         elseif not Svc.Condition[CharacterCondition.occupiedSummoningBell] then
+            -- Teleport back to farming zone
+            local aetheryteName = nil
+            if EnableMultiZoneFarming and MultiZoneList and #MultiZoneList > 0 then
+                -- For Multi Zone, use the zone in the MultiZoneList
+                local currentMultiZone = MultiZoneList[CurrentMultiZoneIndex]
+                if currentMultiZone then
+                    aetheryteName = currentMultiZone.aetheryteName
+                    Dalamud.Log("[MULTI-ZONE] Returning to "..currentMultiZone.name.." via "..aetheryteName)
+                end
+            end
+            
+            -- Fallback to aetheryteList
+            if aetheryteName == nil and SelectedZone.aetheryteList and #SelectedZone.aetheryteList > 0 then
+                aetheryteName = SelectedZone.aetheryteList[1].aetheryteName
+                Dalamud.Log("[FATE] Returning to "..SelectedZone.zoneName.." via "..aetheryteName)
+            end
+            
+            if aetheryteName then
+                TeleportTo(aetheryteName)
+            end
+            
             ReturnToReady()
             return
         end
@@ -3527,7 +3548,7 @@ function Repair()
         return
     end
 
-    local hawkersAlleyAethernetShard = { x=-213.95, y=15.99, z=49.35 }
+    local hawkersAlleyAethernetShard = Vector3(-213.95, 15.99, 49.35)
     if SelfRepair then
         if Inventory.GetItemCount(33916) > 0 then
             if Addons.GetAddon("Shop").Ready then
@@ -3536,7 +3557,23 @@ function Repair()
             end
 
             if Svc.ClientState.TerritoryType ~=  SelectedZone.zoneId then
-                TeleportTo(SelectedZone.aetheryteList[1].aetheryteName)
+                -- Determine correct aetheryte to return to farming zone
+                local aetheryteName = nil
+                if EnableMultiZoneFarming and MultiZoneList and #MultiZoneList > 0 then
+                    local currentMultiZone = MultiZoneList[CurrentMultiZoneIndex]
+                    if currentMultiZone then
+                        aetheryteName = currentMultiZone.aetheryteName
+                    end
+                end
+                if aetheryteName == nil and SelectedZone.aetheryteList and #SelectedZone.aetheryteList > 0 then
+                    aetheryteName = SelectedZone.aetheryteList[1].aetheryteName
+                end
+                
+                if aetheryteName ~= nil then
+                    TeleportTo(aetheryteName)
+                else
+                    Dalamud.Log("[FATE] ERROR: No aetheryte to return to farming zone!")
+                end
                 return
             end
 
@@ -3564,8 +3601,8 @@ function Repair()
                 return
             end
 
-            local darkMatterVendor = { npcName="Unsynrael", x=-257.71, y=16.19, z=50.11, wait=0.08 }
-            if GetDistanceToPoint(darkMatterVendor.position) > (DistanceBetween(hawkersAlleyAethernetShard.position, darkMatterVendor.position) + 10) then
+            local darkMatterVendor = { npcName="Unsynrael", position=Vector3(-257.71, 16.19, 50.11), wait=0.08 }
+            if GetDistanceToPoint(darkMatterVendor.position) > (DistanceBetween(hawkersAlleyAethernetShard, darkMatterVendor.position) + 10) then
                 yield("/li Hawkers' Alley")
                 yield("/wait 1") -- give it a moment to register
             elseif Addons.GetAddon("TelepotTown").Ready then
@@ -3598,8 +3635,8 @@ function Repair()
                 return
             end
             
-            local mender = { npcName="Alistair", x=-246.87, y=16.19, z=49.83 }
-            if GetDistanceToPoint(mender.position) > (DistanceBetween(hawkersAlleyAethernetShard.position, mender.position) + 10) then
+            local mender = { npcName="Alistair", position=Vector3(-246.87, 16.19, 49.83) }
+            if GetDistanceToPoint(mender.position) > (DistanceBetween(hawkersAlleyAethernetShard, mender.position) + 10) then
                 yield("/li Hawkers' Alley")
                 yield("/wait 1") -- give it a moment to register
             elseif Addons.GetAddon("TelepotTown").Ready then
