@@ -3183,28 +3183,15 @@ function Ready()
         end
         return
     elseif Svc.ClientState.TerritoryType ~=  SelectedZone.zoneId then
-        Dalamud.Log("[FATE] Ready -> TeleportBackToFarmingZone")
+        Dalamud.Log("[FATE] Ready -> Zone Mismatch Check")
+        Dalamud.Log("[FATE] Current Territory: "..tostring(Svc.ClientState.TerritoryType)..", SelectedZone.zoneId: "..tostring(SelectedZone.zoneId))
         
-        -- Check if we're in a Multi Zone farming zone
-        if EnableMultiZoneFarming and MultiZoneList and #MultiZoneList > 0 then
-            local currentMultiZone = MultiZoneList[CurrentMultiZoneIndex]
-            if currentMultiZone then
-                -- Check if current territory matches the multi zone we should be in
-                local currentZoneData = nil
-                for _, zone in ipairs(FatesData) do
-                    if zone.zoneId == Svc.ClientState.TerritoryType then
-                        currentZoneData = zone
-                        break
-                    end
-                end
-                
-                if currentZoneData and currentZoneData.zoneName == currentMultiZone.name then
-                    -- We're in the correct multi zone, update SelectedZone
-                    Dalamud.Log("[MULTI-ZONE] Arrived in "..currentMultiZone.name..", updating SelectedZone")
-                    SelectedZone = SelectNextZone()
-                    return
-                end
-            end
+        -- For Multi Zone Farming, just update SelectedZone to current zone
+        if EnableMultiZoneFarming then
+            Dalamud.Log("[MULTI-ZONE] Updating SelectedZone to current territory")
+            SelectedZone = SelectNextZone()
+            Dalamud.Log("[MULTI-ZONE] SelectedZone updated to: "..SelectedZone.zoneName)
+            return
         end
         
         -- If atma farming is enabled, verify SelectedZone is still the right zone
