@@ -66,12 +66,6 @@ configs:
     min: 0
     max: 100
     required: true
-  Ignore FATE if duration is less than (mins):
-    default: 3
-    type: int
-    min: 0
-    max: 100
-    required: true
   Ignore boss FATEs until progress is at least (%):
     default: 0
     type: int
@@ -1107,184 +1101,48 @@ function HasPlugin(name)
 end
 --#endregion Utils
 
---#region Atma Functions
-function GetAtmaZoneData(zoneId)
-    for _, zone in ipairs(AtmaData.zones) do
-        if zone.zoneId == zoneId then
-            return zone
-        end
-    end
-    return nil
-end
+--#region Unified Zone Management System
+-- Farming modes enum
+FarmingMode = {
+    STANDARD = "Standard",      -- Stay in current zone
+    ATMA = "Atma",             -- Switch zones when target atma count reached
+    MULTI_ZONE = "MultiZone"   -- Cycle through configured zones when no fates
+}
 
-function GetAtmaItemCount(itemId)
-    return Inventory.GetItemCount(itemId)
-end
+-- Zone Manager: Unified system for managing zones across all farming modes
+ZoneManager = {
+    currentMode = FarmingMode.STANDARD,
+    multiZoneList = {},
+    multiZoneIndex = 1,
+    targetAtmaPerZone = 3
+}
 
-function CheckAtmaProgress()
-    local currentZone = Svc.ClientState.TerritoryType
-    local atmaZone = GetAtmaZoneData(currentZone)
-    
-    if not atmaZone then
-        return false -- Not in an atma zone
-    end
-    
-    local currentCount = GetAtmaItemCount(atmaZone.itemId)
-    if Echo == "All" then
-        yield("/echo [ATMA] "..atmaZone.itemName..": "..currentCount.."/"..TargetAtmaPerZone)
-    end
-    Dalamud.Log("[ATMA] "..atmaZone.name.." - "..atmaZone.itemName..": "..currentCount.."/"..TargetAtmaPerZone)
-    
-    return currentCount >= TargetAtmaPerZone
-end
-
-function GetNextAtmaZone()
-    for _, zone in ipairs(AtmaData.zones) do
-        local count = GetAtmaItemCount(zone.itemId)
-        if count < TargetAtmaPerZone then
-            return zone
-        end
-    end
-    return nil -- All zones complete
-end
-
-function TeleportToAtmaZone(zoneName)
-    if Echo == "All" then
-        yield("/echo [ATMA] Teleporting to "..zoneName.."...")
-    end
-    Dalamud.Log("[ATMA] Teleporting to "..zoneName)
-    yield("/tp "..zoneName)
-    yield("/wait 1")  -- Small initial wait for command to register
-    
-    -- Wait for teleport to complete by checking character conditions
-    local maxWait = 30
-    local waited = 0
-    
-    -- First wait for betweenAreas to become true (teleport started)
-    while not (Svc.Condition[CharacterCondition.betweenAreas] or Svc.Condition[CharacterCondition.betweenAreasForDuty]) and waited < 5 do
-        yield("/wait 0.5")
-        waited = waited + 0.5
-    end
-    
-    -- Then wait for it to become false (teleport completed)
-    waited = 0
-    while (Svc.Condition[CharacterCondition.betweenAreas] or Svc.Condition[CharacterCondition.betweenAreasForDuty]) and waited < maxWait do
-        yield("/wait 0.5")
-        waited = waited + 0.5
-    end
-    
-    if waited >= maxWait then
-        if Echo == "All" then
-            yield("/echo [ATMA] Teleport timeout!")
-        end
-        Dalamud.Log("[ATMA] Teleport timeout")
-        return false
-    end
-    
-    -- Small wait for zone to fully load after betweenAreas is cleared
-    yield("/wait 1")
-    Dalamud.Log("[ATMA] Teleport completed successfully")
-    return true
-end
-
-function SwitchToNextAtmaZone()
-    local nextZone = GetNextAtmaZone()
-    
-    if not nextZone then
-        if Echo == "All" then
-            yield("/echo [ATMA] All Demiatma farming complete! Collected "..TargetAtmaPerZone.." of each.")
-        end
-        Dalamud.Log("[ATMA] All Demiatma farming complete!")
-        return false
-    end
-    
-    if Echo == "All" then
-        yield("/echo [ATMA] Current zone complete. Moving to "..nextZone.name.."...")
-    end
-    Dalamud.Log("[ATMA] Switching to "..nextZone.name)
-    
-    if TeleportToAtmaZone(nextZone.aetheryteName) then
-        -- TeleportToAtmaZone already waits for completion, update SelectedZone first
-        SelectedZone = SelectNextZone()
-        if Echo == "All" then
-            yield("/echo [FATE] Now farming "..nextZone.name)
-        end
-        Dalamud.Log("[FATE] Zone updated to "..SelectedZone.zoneName.." (ID: "..SelectedZone.zoneId..")")
-        
-        -- Wait a bit for the zone to fully load and FATEs to populate
-        yield("/wait 2")
-        
-        return true
-    end
-    
-    return false
-end
-
-function ReturnToReady()
-    -- Helper function to properly reset state to ready with all necessary cleanup
-    CurrentFate = nil
-    NextFate = nil
-    DidFate = false
-    State = CharacterState.ready
-    GemAnnouncementLock = false
-    MovingAnnouncementLock = false
-    
-    -- If atma farming is enabled, verify we're in the correct zone
+-- Initialize the zone manager based on config
+function ZoneManager:Initialize()
+    -- Determine farming mode
     if EnableAtmaFarming then
-        local currentZone = Svc.ClientState.TerritoryType
-        local currentAtmaZone = GetAtmaZoneData(currentZone)
-        
-        if currentAtmaZone then
-            local currentCount = GetAtmaItemCount(currentAtmaZone.itemId)
-            if currentCount >= TargetAtmaPerZone then
-                -- Current zone complete, update SelectedZone
-                local nextZone = GetNextAtmaZone()
-                if nextZone and nextZone.zoneId ~= SelectedZone.zoneId then
-                    SelectedZone = SelectNextZone()
-                    Dalamud.Log("[ATMA] Updated SelectedZone to "..SelectedZone.zoneName.." after activity")
-                end
-            end
-        end
-    end
-    
-    Dalamud.Log("[FATE] State Change: Ready (via ReturnToReady)")
-end
-
-function GetAtmaStatusMessage()
-    if not EnableAtmaFarming then
-        return ""
-    end
-    
-    local currentZone = Svc.ClientState.TerritoryType
-    local atmaZone = GetAtmaZoneData(currentZone)
-    
-    if not atmaZone then
-        return ""  -- Not in an atma zone
-    end
-    
-    local currentCount = GetAtmaItemCount(atmaZone.itemId)
-    local remaining = TargetAtmaPerZone - currentCount
-    
-    if remaining <= 0 then
-        return " | Atma: Complete!"
+        self.currentMode = FarmingMode.ATMA
+        self.targetAtmaPerZone = TargetAtmaPerZone or 3
+        Dalamud.Log("[ZONE] Initialized in ATMA mode, target: "..self.targetAtmaPerZone.." per zone")
+    elseif EnableMultiZoneFarming then
+        self.currentMode = FarmingMode.MULTI_ZONE
+        self:initializeMultiZoneList()
+        Dalamud.Log("[ZONE] Initialized in MULTI_ZONE mode with "..#self.multiZoneList.." zones")
     else
-        return " | Atma: "..currentCount.."/"..TargetAtmaPerZone.." ("..remaining.." left)"
+        self.currentMode = FarmingMode.STANDARD
+        Dalamud.Log("[ZONE] Initialized in STANDARD mode")
     end
 end
---#endregion Atma Functions
 
---#region Multi Zone Functions
-MultiZoneList = {}
-CurrentMultiZoneIndex = 1
-
-function InitializeMultiZoneList()
-    MultiZoneList = {}
+-- Initialize multi-zone list from config
+function ZoneManager:initializeMultiZoneList()
+    self.multiZoneList = {}
     local zoneListString = Config.Get("Multi Zone List") or ""
     
     -- If empty or default, use all DT zones
     if zoneListString == "" or zoneListString == "Urqopacha,Kozama'uka,Yak T'el,Shaaloani,Heritage Found,Living Memory" then
         for _, zone in ipairs(AtmaData.zones) do
-            table.insert(MultiZoneList, {
+            table.insert(self.multiZoneList, {
                 name = zone.name,
                 zoneId = zone.zoneId,
                 aetheryteName = zone.aetheryteName
@@ -1294,10 +1152,9 @@ function InitializeMultiZoneList()
         -- Parse user-provided comma-separated list
         for zoneName in string.gmatch(zoneListString, "([^,]+)") do
             zoneName = zoneName:match("^%s*(.-)%s*$") -- trim whitespace
-            -- Find zone in AtmaData
             for _, zone in ipairs(AtmaData.zones) do
                 if zone.name == zoneName then
-                    table.insert(MultiZoneList, {
+                    table.insert(self.multiZoneList, {
                         name = zone.name,
                         zoneId = zone.zoneId,
                         aetheryteName = zone.aetheryteName
@@ -1310,44 +1167,303 @@ function InitializeMultiZoneList()
     
     -- Find current zone index
     local currentZone = Svc.ClientState.TerritoryType
-    for i, zone in ipairs(MultiZoneList) do
+    for i, zone in ipairs(self.multiZoneList) do
         if zone.zoneId == currentZone then
-            CurrentMultiZoneIndex = i
+            self.multiZoneIndex = i
             break
         end
     end
     
-    Dalamud.Log("[MULTI-ZONE] Initialized with "..tostring(#MultiZoneList).." zones, starting at index "..tostring(CurrentMultiZoneIndex))
+    Dalamud.Log("[ZONE] Multi-zone list: "..tostring(#self.multiZoneList).." zones, starting at index "..tostring(self.multiZoneIndex))
 end
 
-function GetNextMultiZone()
-    if #MultiZoneList == 0 then
+-- Get atma zone data for a given zone ID
+function ZoneManager:getAtmaZoneData(zoneId)
+    for _, zone in ipairs(AtmaData.zones) do
+        if zone.zoneId == zoneId then
+            return zone
+        end
+    end
+    return nil
+end
+
+-- Get item count for an atma
+function ZoneManager:getAtmaItemCount(itemId)
+    return Inventory.GetItemCount(itemId)
+end
+
+-- Check if current zone's progress goal is met (mode-specific)
+function ZoneManager:shouldSwitchZone()
+    if self.currentMode == FarmingMode.ATMA then
+        local currentZone = Svc.ClientState.TerritoryType
+        local atmaZone = self:getAtmaZoneData(currentZone)
+        
+        if not atmaZone then
+            return false
+        end
+        
+        local currentCount = self:getAtmaItemCount(atmaZone.itemId)
+        local shouldSwitch = currentCount >= self.targetAtmaPerZone
+        
+        if shouldSwitch then
+            Dalamud.Log("[ZONE] Atma target reached: "..currentCount.."/"..self.targetAtmaPerZone)
+        end
+        
+        return shouldSwitch
+        
+    elseif self.currentMode == FarmingMode.MULTI_ZONE then
+        -- Multi-zone switches when no eligible fates (handled by NoEligibleFateCount in Ready())
+        return false
+        
+    else -- STANDARD
+        -- Standard mode never switches zones automatically
+        return false
+    end
+end
+
+-- Get the next zone to farm (mode-specific)
+function ZoneManager:getNextZone()
+    if self.currentMode == FarmingMode.ATMA then
+        -- Find first incomplete atma zone
+        for _, zone in ipairs(AtmaData.zones) do
+            local count = self:getAtmaItemCount(zone.itemId)
+            if count < self.targetAtmaPerZone then
+                return zone
+            end
+        end
+        return nil -- All zones complete
+        
+    elseif self.currentMode == FarmingMode.MULTI_ZONE then
+        -- Cycle to next zone in list
+        if #self.multiZoneList == 0 then
+            return nil
+        end
+        self.multiZoneIndex = (self.multiZoneIndex % #self.multiZoneList) + 1
+        return self.multiZoneList[self.multiZoneIndex]
+        
+    else -- STANDARD
+        -- Standard mode returns nil (no zone switching)
         return nil
     end
-    
-    CurrentMultiZoneIndex = (CurrentMultiZoneIndex % #MultiZoneList) + 1
-    return MultiZoneList[CurrentMultiZoneIndex]
 end
 
-function SwitchToNextMultiZone()
-    local nextZone = GetNextMultiZone()
+-- Switch to the next zone
+function ZoneManager:switchToNextZone()
+    local nextZone = self:getNextZone()
+    
     if not nextZone then
-        Dalamud.Log("[MULTI-ZONE] ERROR: No zones in MultiZoneList")
+        if self.currentMode == FarmingMode.ATMA then
+            if Echo == "All" then
+                yield("/echo [ATMA] All Demiatma farming complete! Collected "..self.targetAtmaPerZone.." of each.")
+            end
+            Dalamud.Log("[ZONE] All Atma zones complete")
+        else
+            Dalamud.Log("[ZONE] No next zone available")
+        end
         return false
     end
     
-    Dalamud.Log("[MULTI-ZONE] Switching to "..nextZone.name.." via "..nextZone.aetheryteName)
+    -- Log the switch
+    local modePrefix = (self.currentMode == FarmingMode.ATMA) and "[ATMA]" or "[MULTI-ZONE]"
+    Dalamud.Log(modePrefix.." Switching to "..nextZone.name.." via "..nextZone.aetheryteName)
     if Echo == "All" then
-        yield("/echo [MULTI-ZONE] Switching to "..nextZone.name)
+        yield("/echo "..modePrefix.." Switching to "..nextZone.name)
     end
     
+    -- Teleport to new zone
     TeleportTo(nextZone.aetheryteName)
-    -- SelectedZone will be updated automatically when we arrive in the new zone
-    -- by the check in Ready() function: "elseif Svc.ClientState.TerritoryType ~= SelectedZone.zoneId"
+    yield("/wait 1")
+    
+    -- Update SelectedZone
+    SelectedZone = SelectNextZone()
+    if Echo == "All" then
+        yield("/echo [FATE] Now farming "..SelectedZone.zoneName)
+    end
+    Dalamud.Log("[ZONE] Updated SelectedZone to "..SelectedZone.zoneName.." (ID: "..SelectedZone.zoneId..")")
+    
+    -- Wait for zone to fully load
+    yield("/wait 2")
     
     return true
 end
---#endregion Multi Zone Functions
+
+-- Get progress status message for current mode
+function ZoneManager:getProgressMessage()
+    if self.currentMode == FarmingMode.ATMA then
+        local currentZone = Svc.ClientState.TerritoryType
+        local atmaZone = self:getAtmaZoneData(currentZone)
+        
+        if not atmaZone then
+            return ""
+        end
+        
+        local currentCount = self:getAtmaItemCount(atmaZone.itemId)
+        local remaining = self.targetAtmaPerZone - currentCount
+        
+        if remaining <= 0 then
+            return " | Atma: Complete!"
+        else
+            return " | Atma: "..currentCount.."/"..self.targetAtmaPerZone.." ("..remaining.." left)"
+        end
+        
+    elseif self.currentMode == FarmingMode.MULTI_ZONE then
+        if #self.multiZoneList > 0 then
+            return " | Multi-Zone: "..self.multiZoneIndex.."/"..#self.multiZoneList
+        end
+        return ""
+        
+    else -- STANDARD
+        return ""
+    end
+end
+
+-- Get the aetheryte name to return to after activities like repair/retainers
+function ZoneManager:getReturnAetheryte()
+    -- For Multi-Zone, return to current multi-zone entry
+    if self.currentMode == FarmingMode.MULTI_ZONE and #self.multiZoneList > 0 then
+        local currentMultiZone = self.multiZoneList[self.multiZoneIndex]
+        if currentMultiZone then
+            Dalamud.Log("[ZONE] Return aetheryte (multi-zone): "..currentMultiZone.aetheryteName)
+            return currentMultiZone.aetheryteName
+        end
+    end
+    
+    -- For Atma and Standard, use first aetheryte in SelectedZone
+    if SelectedZone.aetheryteList and #SelectedZone.aetheryteList > 0 then
+        local aetheryteName = SelectedZone.aetheryteList[1].aetheryteName
+        Dalamud.Log("[ZONE] Return aetheryte (selected zone): "..aetheryteName)
+        return aetheryteName
+    end
+    
+    Dalamud.Log("[ZONE] ERROR: No return aetheryte available!")
+    return nil
+end
+
+-- Check progress after fate completion (for Atma mode)
+function ZoneManager:checkProgressAfterFate()
+    if self.currentMode == FarmingMode.ATMA then
+        if self:shouldSwitchZone() then
+            return self:switchToNextZone()
+        end
+    end
+    return true
+end
+
+-- Initialize on first zone selection
+function ZoneManager:initializeStartingZone()
+    if self.currentMode == FarmingMode.ATMA then
+        local nextZone = self:getNextZone()
+        if nextZone then
+            if Echo == "All" then
+                yield("/echo [ATMA] Starting Dawntrail Demiatma farming!")
+                yield("/echo [ATMA] Target: "..self.targetAtmaPerZone.." of each Demiatma")
+            end
+            Dalamud.Log("[ZONE] Atma farming - Target: "..self.targetAtmaPerZone.." per zone")
+            
+            -- Check if we're already in a valid atma zone
+            local currentZone = Svc.ClientState.TerritoryType
+            local currentAtmaZone = self:getAtmaZoneData(currentZone)
+            
+            local shouldTeleport = false
+            if not currentAtmaZone then
+                shouldTeleport = true
+            else
+                local currentCount = self:getAtmaItemCount(currentAtmaZone.itemId)
+                if currentCount >= self.targetAtmaPerZone then
+                    shouldTeleport = true
+                else
+                    if Echo == "All" then
+                        yield("/echo [ATMA] Continuing in current zone: "..currentAtmaZone.name)
+                    end
+                    Dalamud.Log("[ZONE] Continuing in current zone: "..currentAtmaZone.name)
+                end
+            end
+            
+            if shouldTeleport and Svc.ClientState.TerritoryType ~= nextZone.zoneId then
+                TeleportTo(nextZone.aetheryteName)
+                yield("/wait 1")
+            end
+        else
+            if Echo == "All" then
+                yield("/echo [ATMA] All Demiatma already collected! Switching to Standard mode.")
+            end
+            Dalamud.Log("[ZONE] All Demiatma already collected")
+            self.currentMode = FarmingMode.STANDARD
+            EnableAtmaFarming = false
+        end
+    end
+end
+
+-- Helper function to return to ready state with proper cleanup
+function ReturnToReady()
+    CurrentFate = nil
+    NextFate = nil
+    DidFate = false
+    State = CharacterState.ready
+    GemAnnouncementLock = false
+    MovingAnnouncementLock = false
+    
+    -- Check if zone needs updating after activity
+    if ZoneManager.currentMode == FarmingMode.ATMA then
+        if ZoneManager:shouldSwitchZone() then
+            local nextZone = ZoneManager:getNextZone()
+            if nextZone and nextZone.zoneId ~= SelectedZone.zoneId then
+                SelectedZone = SelectNextZone()
+                Dalamud.Log("[ZONE] Updated SelectedZone after activity")
+            end
+        end
+    end
+    
+    Dalamud.Log("[FATE] State Change: Ready (via ReturnToReady)")
+end
+
+-- Legacy compatibility functions (redirect to ZoneManager)
+function GetAtmaZoneData(zoneId)
+    return ZoneManager:getAtmaZoneData(zoneId)
+end
+
+function GetAtmaItemCount(itemId)
+    return ZoneManager:getAtmaItemCount(itemId)
+end
+
+function CheckAtmaProgress()
+    return ZoneManager:shouldSwitchZone()
+end
+
+function GetNextAtmaZone()
+    if ZoneManager.currentMode == FarmingMode.ATMA then
+        return ZoneManager:getNextZone()
+    end
+    return nil
+end
+
+function SwitchToNextAtmaZone()
+    return ZoneManager:switchToNextZone()
+end
+
+function GetAtmaStatusMessage()
+    return ZoneManager:getProgressMessage()
+end
+
+function InitializeMultiZoneList()
+    ZoneManager:initializeMultiZoneList()
+    -- Update legacy globals for compatibility
+    MultiZoneList = ZoneManager.multiZoneList
+    CurrentMultiZoneIndex = ZoneManager.multiZoneIndex
+end
+
+function GetNextMultiZone()
+    if ZoneManager.currentMode == FarmingMode.MULTI_ZONE then
+        return ZoneManager:getNextZone()
+    end
+    return nil
+end
+
+function SwitchToNextMultiZone()
+    return ZoneManager:switchToNextZone()
+end
+
+--#endregion Unified Zone Management System
 
 --#region Fate Functions
 function IsCollectionsFate(fateName)
@@ -1792,34 +1908,35 @@ function ForceTeleportToNearestAetheryte()
     return true
 end
 
-function DistanceFromClosestAetheryteToPoint(vec3, teleportTimePenalty)
-    local closestAetheryte = nil
-    local closestTravelDistance = math.maxinteger
+function EvaluateClosestAetheryte(position, teleportTimePenalty)
+    local bestAetheryte = nil
+    local bestDistance = math.maxinteger
+    if SelectedZone.aetheryteList == nil then
+        return nil, math.maxinteger
+    end
     for _, aetheryte in ipairs(SelectedZone.aetheryteList) do
-        local distanceAetheryteToFate = DistanceBetween(aetheryte.position, vec3)
-        local comparisonDistance = distanceAetheryteToFate + teleportTimePenalty
-        Dalamud.Log("[FATE] Distance via "..aetheryte.aetheryteName.." adjusted for tp penalty is "..tostring(comparisonDistance))
-
-        if comparisonDistance < closestTravelDistance then
+        Dalamud.Log("[FATE] Considering aetheryte "..aetheryte.aetheryteName)
+        local travelDistance = DistanceBetween(aetheryte.position, position) + teleportTimePenalty
+        Dalamud.Log("[FATE] Distance via "..aetheryte.aetheryteName.." adjusted for tp penalty is "..tostring(travelDistance))
+        if travelDistance < bestDistance then
             Dalamud.Log("[FATE] Updating closest aetheryte to "..aetheryte.aetheryteName)
-            closestTravelDistance = comparisonDistance
-            closestAetheryte = aetheryte
+            bestDistance = travelDistance
+            bestAetheryte = aetheryte
         end
     end
+    return bestAetheryte, bestDistance
+end
 
-    return closestTravelDistance
+function DistanceFromClosestAetheryteToPoint(vec3, teleportTimePenalty)
+    local _, distance = EvaluateClosestAetheryte(vec3, teleportTimePenalty)
+    return distance
 end
 
 function GetDistanceToPointWithAetheryteTravel(vec3)
-    -- Get the direct flight distance (no aetheryte)
     local directFlightDistance = GetDistanceToPoint(vec3)
     Dalamud.Log("[FATE] Direct flight distance is: " .. directFlightDistance)
-
-    -- Get the distance to the closest aetheryte, including teleportation penalty
-    local distanceToAetheryte = DistanceFromClosestAetheryteToPoint(vec3, 200)
+    local _, distanceToAetheryte = EvaluateClosestAetheryte(vec3, 200)
     Dalamud.Log("[FATE] Distance via closest Aetheryte is: " .. (distanceToAetheryte or "nil"))
-
-    -- Return the minimum distance, either via direct flight or via the closest aetheryte travel
     if distanceToAetheryte == nil then
         return directFlightDistance
     else
@@ -1828,37 +1945,21 @@ function GetDistanceToPointWithAetheryteTravel(vec3)
 end
 
 function GetClosestAetheryte(position, teleportTimePenalty)
-    local closestAetheryte = nil
-    local closestTravelDistance = math.maxinteger
-    for _, aetheryte in ipairs(SelectedZone.aetheryteList) do
-        Dalamud.Log("[FATE] Considering aetheryte "..aetheryte.aetheryteName)
-        local distanceAetheryteToFate = DistanceBetween(aetheryte.position, position)
-        local comparisonDistance = distanceAetheryteToFate + teleportTimePenalty
-        Dalamud.Log("[FATE] Distance via "..aetheryte.aetheryteName.." adjusted for tp penalty is "..tostring(comparisonDistance))
-
-        if comparisonDistance < closestTravelDistance then
-            Dalamud.Log("[FATE] Updating closest aetheryte to "..aetheryte.aetheryteName)
-            closestTravelDistance = comparisonDistance
-            closestAetheryte = aetheryte
-        end
-    end
+    local closestAetheryte, _ = EvaluateClosestAetheryte(position, teleportTimePenalty)
     if closestAetheryte ~= nil then
         Dalamud.Log("[FATE] Final selected aetheryte is: "..closestAetheryte.aetheryteName)
     else
         Dalamud.Log("[FATE] Closest aetheryte is nil")
     end
-
     return closestAetheryte
 end
 
 function GetClosestAetheryteToPoint(position, teleportTimePenalty)
     local directFlightDistance = GetDistanceToPoint(position)
     Dalamud.Log("[FATE] Direct flight distance is: "..directFlightDistance)
-    local closestAetheryte = GetClosestAetheryte(position, teleportTimePenalty)
+    local closestAetheryte, closestDistance = EvaluateClosestAetheryte(position, teleportTimePenalty)
     if closestAetheryte ~= nil then
-        local closestAetheryteDistance = DistanceBetween(position, closestAetheryte.position) + teleportTimePenalty
-
-        if closestAetheryteDistance < directFlightDistance then
+        if closestDistance < directFlightDistance then
             return closestAetheryte
         end
     end
@@ -1899,7 +2000,7 @@ function AcceptTeleportOfferLocation(destinationAetheryte)
     end
 end
 
-function TeleportTo(aetheryteName)
+function TeleportTo(aetheryteName, commandType)
     AcceptTeleportOfferLocation(aetheryteName)
 
     while EorzeaTimeToUnixTime(Instances.Framework.EorzeaTime) - LastTeleportTimeStamp < 5 do
@@ -1907,19 +2008,35 @@ function TeleportTo(aetheryteName)
         yield("/wait 5.001")
     end
 
-    yield("/li tp "..aetheryteName)
-    yield("/wait 1") -- wait for casting to begin
+    local command = "/li tp "..aetheryteName
+    if commandType == "tp" then
+        command = "/tp "..aetheryteName
+    end
+
+    yield(command)
+    local waited = 0
+    while not (Svc.Condition[CharacterCondition.casting] or Svc.Condition[CharacterCondition.betweenAreas] or Svc.Condition[CharacterCondition.betweenAreasForDuty]) and waited < 5 do
+        yield("/wait 0.5")
+        waited = waited + 0.5
+    end
     while Svc.Condition[CharacterCondition.casting] do
         Dalamud.Log("[FATE] Casting teleport...")
         yield("/wait 1")
     end
-    yield("/wait 1") -- wait for that microsecond in between the cast finishing and the transition beginning
-    while Svc.Condition[CharacterCondition.betweenAreas] do
+    local maxWait = 30
+    waited = 0
+    while (Svc.Condition[CharacterCondition.betweenAreas] or Svc.Condition[CharacterCondition.betweenAreasForDuty]) and waited < maxWait do
         Dalamud.Log("[FATE] Teleporting...")
-        yield("/wait 1")
+        yield("/wait 0.5")
+        waited = waited + 0.5
+    end
+    if waited >= maxWait then
+        Dalamud.Log("[FATE] Teleport timeout")
+        return false
     end
     yield("/wait 1")
     LastTeleportTimeStamp = EorzeaTimeToUnixTime(Instances.Framework.EorzeaTime)
+    return true
 end
 
 function ChangeInstance()
@@ -2451,8 +2568,8 @@ function MoveToFate()
         Dalamud.Log("[FATE] Moving to fate #"..CurrentFate.fateId.." "..CurrentFate.fateName)
         MovingAnnouncementLock = true
         if Echo == "All" then
-            local atmaStatus = GetAtmaStatusMessage()
-            yield("/echo [FATE] Moving to fate #"..CurrentFate.fateId.." "..CurrentFate.fateName..atmaStatus)
+            local progressStatus = ZoneManager:getProgressMessage()
+            yield("/echo [FATE] Moving to fate #"..CurrentFate.fateId.." "..CurrentFate.fateName..progressStatus)
         end
     end
 
@@ -3061,27 +3178,24 @@ function Ready()
     FoodCheck()
     PotionCheck()
 
-    -- Check if current zone is complete for atma farming BEFORE doing anything else
-    if EnableAtmaFarming then
-        local currentZone = Svc.ClientState.TerritoryType
-        if currentZone == SelectedZone.zoneId then
-            local atmaZone = GetAtmaZoneData(currentZone)
-            if atmaZone then
-                local count = GetAtmaItemCount(atmaZone.itemId)
-                if count >= TargetAtmaPerZone then
-                    -- Current zone is complete, switch immediately
-                    Dalamud.Log("[ATMA] Current zone "..atmaZone.name.." complete, switching zones from Ready()")
-                    if SwitchToNextAtmaZone() then
-                        -- SwitchToNextAtmaZone already updated SelectedZone, continue to select next fate
-                        Dalamud.Log("[FATE] Zone switched in Ready(), SelectedZone now: "..SelectedZone.zoneName)
-                    else
-                        -- All zones complete
-                        EnableAtmaFarming = false
-                        if Echo == "All" then
-                            yield("/echo [ATMA] All Demiatma complete! Disabling atma farming.")
-                        end
-                    end
+    -- Unified zone switching check using ZoneManager
+    if ZoneManager:shouldSwitchZone() then
+        local nextZone = ZoneManager:getNextZone()
+        if nextZone then
+            Dalamud.Log("[ZONE] Current zone complete, switching from Ready()")
+            if ZoneManager:switchToNextZone() then
+                Dalamud.Log("[ZONE] Successfully switched, SelectedZone now: "..SelectedZone.zoneName)
+                return
+            end
+        else
+            -- All zones complete (for Atma mode)
+            if ZoneManager.currentMode == FarmingMode.ATMA then
+                EnableAtmaFarming = false
+                ZoneManager.currentMode = FarmingMode.STANDARD
+                if Echo == "All" then
+                    yield("/echo [ATMA] All Demiatma complete! Switching to Standard mode.")
                 end
+                Dalamud.Log("[ZONE] All Atma zones complete, switched to Standard mode")
             end
         end
     end
@@ -3153,22 +3267,10 @@ function Ready()
         Dalamud.Log("[FATE] Ready -> GC TurnIn")
         State = CharacterState.gcTurnIn
         Dalamud.Log("[FATE] State Change: GCTurnIn")
-    elseif NextFate == nil and EnableAtmaFarming and DownTimeWaitAtNearestAetheryte then
-        -- Atma Farming: go to nearest aetheryte in same zone and wait
-        Dalamud.Log("[ATMA] No fates available, going to nearest aetheryte")
-        if Svc.Targets.Target == nil or GetTargetName() ~= "aetheryte" or GetDistanceToTarget() > 20 then
-            State = CharacterState.flyBackToAetheryte
-            Dalamud.Log("[FATE] State Change: FlyBackToAetheryte (atma - no fates)")
-        else
-            -- Already at aetheryte, just wait
-            Dalamud.Log("[ATMA] Already at aetheryte, waiting...")
-            yield("/wait 10")
-        end
-        return
-    elseif NextFate == nil and EnableMultiZoneFarming then
+    elseif NextFate == nil and ZoneManager.currentMode == FarmingMode.MULTI_ZONE then
         -- Multi Zone Farming: switch zone when no fates
         Dalamud.Log("[MULTI-ZONE] No fates available, switching to next zone")
-        if SwitchToNextMultiZone() then
+        if ZoneManager:switchToNextZone() then
             return
         end
     elseif NextFate == nil and DownTimeWaitAtNearestAetheryte then
@@ -3186,56 +3288,37 @@ function Ready()
         Dalamud.Log("[FATE] Ready -> Zone Mismatch Check")
         Dalamud.Log("[FATE] Current Territory: "..tostring(Svc.ClientState.TerritoryType)..", SelectedZone.zoneId: "..tostring(SelectedZone.zoneId))
         
-        -- For Multi Zone Farming, just update SelectedZone to current zone
-        if EnableMultiZoneFarming then
+        -- For Multi Zone, just update SelectedZone to current zone
+        if ZoneManager.currentMode == FarmingMode.MULTI_ZONE then
             Dalamud.Log("[MULTI-ZONE] Updating SelectedZone to current territory")
             SelectedZone = SelectNextZone()
             Dalamud.Log("[MULTI-ZONE] SelectedZone updated to: "..SelectedZone.zoneName)
             return
         end
         
-        -- If atma farming is enabled, verify SelectedZone is still the right zone
-        if EnableAtmaFarming then
-            local selectedAtmaZone = GetAtmaZoneData(SelectedZone.zoneId)
-            if selectedAtmaZone then
-                local count = GetAtmaItemCount(selectedAtmaZone.itemId)
-                if count >= TargetAtmaPerZone then
-                    -- SelectedZone is complete, get next zone
-                    local nextZone = GetNextAtmaZone()
-                    if nextZone then
-                        Dalamud.Log("[ATMA] SelectedZone "..SelectedZone.zoneName.." is complete, updating to next zone")
-                        if TeleportToAtmaZone(nextZone.aetheryteName) then
-                            SelectedZone = SelectNextZone()
-                            Dalamud.Log("[FATE] Updated to "..SelectedZone.zoneName)
-                        end
+        -- For Atma mode, check if need to switch zones
+        if ZoneManager.currentMode == FarmingMode.ATMA then
+            if ZoneManager:shouldSwitchZone() then
+                local nextZone = ZoneManager:getNextZone()
+                if nextZone then
+                    Dalamud.Log("[ATMA] Current zone complete, switching to next zone")
+                    if ZoneManager:switchToNextZone() then
+                        Dalamud.Log("[ZONE] Zone switched successfully")
                         return
-                    else
-                        -- All zones complete
-                        EnableAtmaFarming = false
-                        if Echo == "All" then
-                            yield("/echo [ATMA] All zones complete! Atma farming disabled.")
-                        end
+                    end
+                else
+                    -- All zones complete
+                    EnableAtmaFarming = false
+                    ZoneManager.currentMode = FarmingMode.STANDARD
+                    if Echo == "All" then
+                        yield("/echo [ATMA] All zones complete! Switching to Standard mode.")
                     end
                 end
             end
         end
         
-        -- Teleport back to farming zone
-        local aetheryteName = nil
-        if EnableMultiZoneFarming and MultiZoneList and #MultiZoneList > 0 then
-            -- For Multi Zone, use the zone in the MultiZoneList
-            local currentMultiZone = MultiZoneList[CurrentMultiZoneIndex]
-            if currentMultiZone then
-                aetheryteName = currentMultiZone.aetheryteName
-                Dalamud.Log("[MULTI-ZONE] Returning to "..currentMultiZone.name.." via "..aetheryteName)
-            end
-        end
-        
-        -- Fallback to aetheryteList
-        if aetheryteName == nil and SelectedZone.aetheryteList and #SelectedZone.aetheryteList > 0 then
-            aetheryteName = SelectedZone.aetheryteList[1].aetheryteName
-            Dalamud.Log("[FATE] Returning to "..SelectedZone.zoneName.." via "..aetheryteName)
-        end
+        -- Teleport back to farming zone using ZoneManager
+        local aetheryteName = ZoneManager:getReturnAetheryte()
         
         if aetheryteName ~= nil then
             TeleportTo(aetheryteName)
@@ -3341,11 +3424,11 @@ function Ready()
 
     if not GemAnnouncementLock and (Echo == "All" or Echo == "Gems") then
         GemAnnouncementLock = true
-        local atmaStatus = GetAtmaStatusMessage()
+        local progressStatus = ZoneManager:getProgressMessage()
         if BicolorGemCount >= 1400 then
-            yield("/echo [FATE] You're almost capped with "..tostring(BicolorGemCount).."/1500 gems! <se.3>"..atmaStatus)
+            yield("/echo [FATE] You're almost capped with "..tostring(BicolorGemCount).."/1500 gems! <se.3>"..progressStatus)
         else
-            yield("/echo [FATE] Gems: "..tostring(BicolorGemCount).."/1500"..atmaStatus)
+            yield("/echo [FATE] Gems: "..tostring(BicolorGemCount).."/1500"..progressStatus)
         end
     end
 end
@@ -3497,22 +3580,8 @@ function ProcessRetainers()
         if Addons.GetAddon("RetainerList").Ready then
             yield("/callback RetainerList true -1")
         elseif not Svc.Condition[CharacterCondition.occupiedSummoningBell] then
-            -- Teleport back to farming zone
-            local aetheryteName = nil
-            if EnableMultiZoneFarming and MultiZoneList and #MultiZoneList > 0 then
-                -- For Multi Zone, use the zone in the MultiZoneList
-                local currentMultiZone = MultiZoneList[CurrentMultiZoneIndex]
-                if currentMultiZone then
-                    aetheryteName = currentMultiZone.aetheryteName
-                    Dalamud.Log("[MULTI-ZONE] Returning to "..currentMultiZone.name.." via "..aetheryteName)
-                end
-            end
-            
-            -- Fallback to aetheryteList
-            if aetheryteName == nil and SelectedZone.aetheryteList and #SelectedZone.aetheryteList > 0 then
-                aetheryteName = SelectedZone.aetheryteList[1].aetheryteName
-                Dalamud.Log("[FATE] Returning to "..SelectedZone.zoneName.." via "..aetheryteName)
-            end
+            -- Use ZoneManager to get correct return aetheryte
+            local aetheryteName = ZoneManager:getReturnAetheryte()
             
             if aetheryteName then
                 TeleportTo(aetheryteName)
@@ -3577,17 +3646,8 @@ function Repair()
             end
 
             if Svc.ClientState.TerritoryType ~=  SelectedZone.zoneId then
-                -- Determine correct aetheryte to return to farming zone
-                local aetheryteName = nil
-                if EnableMultiZoneFarming and MultiZoneList and #MultiZoneList > 0 then
-                    local currentMultiZone = MultiZoneList[CurrentMultiZoneIndex]
-                    if currentMultiZone then
-                        aetheryteName = currentMultiZone.aetheryteName
-                    end
-                end
-                if aetheryteName == nil and SelectedZone.aetheryteList and #SelectedZone.aetheryteList > 0 then
-                    aetheryteName = SelectedZone.aetheryteList[1].aetheryteName
-                end
+                -- Use ZoneManager to get correct return aetheryte
+                local aetheryteName = ZoneManager:getReturnAetheryte()
                 
                 if aetheryteName ~= nil then
                     TeleportTo(aetheryteName)
@@ -3685,22 +3745,8 @@ function Repair()
                 end
             end
         else
-            -- Repair complete, teleport back to farming zone
-            local aetheryteName = nil
-            if EnableMultiZoneFarming and MultiZoneList and #MultiZoneList > 0 then
-                -- For Multi Zone, use the zone in the MultiZoneList
-                local currentMultiZone = MultiZoneList[CurrentMultiZoneIndex]
-                if currentMultiZone then
-                    aetheryteName = currentMultiZone.aetheryteName
-                    Dalamud.Log("[MULTI-ZONE] Returning to "..currentMultiZone.name.." via "..aetheryteName)
-                end
-            end
-            
-            -- Fallback to aetheryteList
-            if aetheryteName == nil and SelectedZone.aetheryteList and #SelectedZone.aetheryteList > 0 then
-                aetheryteName = SelectedZone.aetheryteList[1].aetheryteName
-                Dalamud.Log("[FATE] Returning to "..SelectedZone.zoneName.." via "..aetheryteName)
-            end
+            -- Repair complete, use ZoneManager to get correct return aetheryte
+            local aetheryteName = ZoneManager:getReturnAetheryte()
             
             if aetheryteName then
                 TeleportTo(aetheryteName)
@@ -4019,51 +4065,11 @@ if ClassForBossFates ~= "" then
 end
 SetMaxDistance()
 
--- Initialize atma farming if enabled
-if EnableAtmaFarming then
-    local nextZone = GetNextAtmaZone()
-    if nextZone then
-        if Echo == "All" then
-            yield("/echo [ATMA] Starting Dawntrail Demiatma farming!")
-            yield("/echo [ATMA] Target: "..TargetAtmaPerZone.." of each Demiatma")
-        end
-        Dalamud.Log("[ATMA] Starting Dawntrail Demiatma farming - Target: "..TargetAtmaPerZone.." per zone")
-        
-        -- Check if we're already in a valid atma zone
-        local currentZone = Svc.ClientState.TerritoryType
-        local currentAtmaZone = GetAtmaZoneData(currentZone)
-        
-        -- Only teleport if not in an atma zone, or if current zone is already complete
-        local shouldTeleport = false
-        if not currentAtmaZone then
-            -- Not in any atma zone, need to teleport
-            shouldTeleport = true
-        else
-            -- Check if current zone is complete
-            local currentCount = GetAtmaItemCount(currentAtmaZone.itemId)
-            if currentCount >= TargetAtmaPerZone then
-                -- Current zone is complete, teleport to next incomplete zone
-                shouldTeleport = true
-            else
-                -- Current zone still needs farming, stay here
-                if Echo == "All" then
-                    yield("/echo [ATMA] Continuing in current zone: "..currentAtmaZone.name)
-                end
-                Dalamud.Log("[ATMA] Continuing in current zone: "..currentAtmaZone.name)
-            end
-        end
-        
-        if shouldTeleport and Svc.ClientState.TerritoryType ~= nextZone.zoneId then
-            TeleportToAtmaZone(nextZone.aetheryteName)
-        end
-    else
-        EnableAtmaFarming = false
-        if Echo == "All" then
-            yield("/echo [ATMA] All Demiatma already collected! Atma farming disabled.")
-        end
-        Dalamud.Log("[ATMA] All Demiatma already collected")
-    end
-end
+-- Initialize ZoneManager with configured farming mode
+ZoneManager:Initialize()
+
+-- Initialize starting zone for Atma farming mode
+ZoneManager:initializeStartingZone()
 
 SelectedZone = SelectNextZone()
 if SelectedZone.zoneName ~= "" and Echo == "All" then
@@ -4103,16 +4109,16 @@ if ShouldSummonChocobo and GetBuddyTimeRemaining() > 0 then
     yield('/cac "'..ChocoboStance..' stance"')
 end
 
--- Log active farming mode
-if EnableAtmaFarming then
+-- Log active farming mode using ZoneManager
+if ZoneManager.currentMode == FarmingMode.ATMA then
     Dalamud.Log("[FATE] Atma Farming Mode: ACTIVE")
     if Echo == "All" then
         yield("/echo [FATE] Atma Farming Mode: Enabled")
     end
-elseif EnableMultiZoneFarming then
-    Dalamud.Log("[FATE] Multi Zone Farming Mode: ACTIVE ("..tostring(#MultiZoneList).." zones)")
+elseif ZoneManager.currentMode == FarmingMode.MULTI_ZONE then
+    Dalamud.Log("[FATE] Multi Zone Farming Mode: ACTIVE ("..tostring(#ZoneManager.multiZoneList).." zones)")
     if Echo == "All" then
-        yield("/echo [FATE] Multi Zone Farming Mode: Enabled with "..tostring(#MultiZoneList).." zones")
+        yield("/echo [FATE] Multi Zone Farming Mode: Enabled with "..tostring(#ZoneManager.multiZoneList).." zones")
     end
 else
     Dalamud.Log("[FATE] Standard Single Zone Farming Mode")
@@ -4155,28 +4161,16 @@ while not StopScript do
             WaitingForFateRewards = nil
             Dalamud.Log("[FATE] WaitingForFateRewards: "..tostring(WaitingForFateRewards))
             
-            -- Check atma progress after fate completion if enabled
-            if EnableAtmaFarming then
-                if CheckAtmaProgress() then
-                    -- Current zone complete, switch to next zone
-                    if SwitchToNextAtmaZone() then
-                        -- Successfully switched zones, reset everything and continue main loop
-                        CurrentFate = nil
-                        NextFate = nil
-                        DidFate = false
-                        State = CharacterState.ready
-                        GemAnnouncementLock = false
-                        MovingAnnouncementLock = false
-                        Dalamud.Log("[FATE] Zone switch complete, resetting to Ready state")
-                        -- Do NOT return here - let main loop continue normally
-                    else
-                        -- All atma farming complete, disable it
-                        EnableAtmaFarming = false
-                        if Echo == "All" then
-                            yield("/echo [ATMA] Atma farming disabled - all zones complete!")
-                        end
-                        Dalamud.Log("[ATMA] Atma farming disabled - all zones complete")
+            -- Check progress after fate completion using ZoneManager
+            if not ZoneManager:checkProgressAfterFate() then
+                -- All zones complete for Atma mode
+                if ZoneManager.currentMode == FarmingMode.ATMA then
+                    EnableAtmaFarming = false
+                    ZoneManager.currentMode = FarmingMode.STANDARD
+                    if Echo == "All" then
+                        yield("/echo [ATMA] Atma farming complete! Switched to Standard mode.")
                     end
+                    Dalamud.Log("[ZONE] All Atma zones complete, switched to Standard mode")
                 end
             end
         end
