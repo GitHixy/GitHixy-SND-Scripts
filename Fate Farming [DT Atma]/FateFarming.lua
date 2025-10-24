@@ -1336,13 +1336,14 @@ function SwitchToNextMultiZone()
         return false
     end
     
-    Dalamud.Log("[MULTI-ZONE] Switching to "..nextZone.name)
+    Dalamud.Log("[MULTI-ZONE] Switching to "..nextZone.name.." via "..nextZone.aetheryteName)
     if Echo == "All" then
         yield("/echo [MULTI-ZONE] Switching to "..nextZone.name)
     end
     
     TeleportTo(nextZone.aetheryteName)
-    SelectedZone = SelectNextZone()
+    -- SelectedZone will be updated automatically when we arrive in the new zone
+    -- by the check in Ready() function: "elseif Svc.ClientState.TerritoryType ~= SelectedZone.zoneId"
     
     return true
 end
@@ -3152,6 +3153,24 @@ function Ready()
         Dalamud.Log("[FATE] Ready -> GC TurnIn")
         State = CharacterState.gcTurnIn
         Dalamud.Log("[FATE] State Change: GCTurnIn")
+    elseif NextFate == nil and EnableAtmaFarming and DownTimeWaitAtNearestAetheryte then
+        -- Atma Farming: go to nearest aetheryte in same zone and wait
+        Dalamud.Log("[ATMA] No fates available, going to nearest aetheryte")
+        if Svc.Targets.Target == nil or GetTargetName() ~= "aetheryte" or GetDistanceToTarget() > 20 then
+            State = CharacterState.flyBackToAetheryte
+            Dalamud.Log("[FATE] State Change: FlyBackToAetheryte (atma - no fates)")
+        else
+            -- Already at aetheryte, just wait
+            Dalamud.Log("[ATMA] Already at aetheryte, waiting...")
+            yield("/wait 10")
+        end
+        return
+    elseif NextFate == nil and EnableMultiZoneFarming then
+        -- Multi Zone Farming: switch zone when no fates
+        Dalamud.Log("[MULTI-ZONE] No fates available, switching to next zone")
+        if SwitchToNextMultiZone() then
+            return
+        end
     elseif NextFate == nil and DownTimeWaitAtNearestAetheryte then
         Dalamud.Log("[FATE] Ready -> FlyBackToAetheryte check")
         if Svc.Targets.Target == nil or GetTargetName() ~= "aetheryte" or GetDistanceToTarget() > 20 then
@@ -3226,15 +3245,6 @@ function Ready()
         Dalamud.Log("[FATE] DownTimeWaitAtNearestAetheryte: "..tostring(DownTimeWaitAtNearestAetheryte))
         NoEligibleFateCount = (NoEligibleFateCount or 0) + 1
         Dalamud.Log("[FATE] No eligible fate streak count: "..tostring(NoEligibleFateCount))
-
-        -- Multi Zone Farming: switch zone when no fates
-        if EnableMultiZoneFarming and not shouldWaitForBonusBuff then
-            Dalamud.Log("[MULTI-ZONE] No eligible fates, switching to next zone")
-            if SwitchToNextMultiZone() then
-                NoEligibleFateCount = 0
-                return
-            end
-        end
         
         if NoEligibleFateCount >= 10 then
             Dalamud.Log("[FATE] No eligible fates for "..tostring(NoEligibleFateCount).." checks, forcing teleport to nearest aetheryte")
