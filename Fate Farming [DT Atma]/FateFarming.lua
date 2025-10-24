@@ -3637,10 +3637,13 @@ function Repair()
             
             local mender = { npcName="Alistair", position=Vector3(-246.87, 16.19, 49.83) }
             if GetDistanceToPoint(mender.position) > (DistanceBetween(hawkersAlleyAethernetShard, mender.position) + 10) then
-                yield("/li Hawkers' Alley")
-                yield("/wait 1") -- give it a moment to register
-            elseif Addons.GetAddon("TelepotTown").Ready then
-                yield("/callback TelepotTown false -1")
+                if Addons.GetAddon("TelepotTown").Ready then
+                    yield("/callback TelepotTown false -1")
+                    yield("/wait 0.5")
+                else
+                    yield("/li Hawkers' Alley")
+                    yield("/wait 1") -- give it a moment to register
+                end
             elseif GetDistanceToPoint(mender.position) > 5 then
                 if not (IPC.vnavmesh.PathfindInProgress() or IPC.vnavmesh.IsRunning()) then
                     IPC.vnavmesh.PathfindAndMoveTo(mender.position, false)
