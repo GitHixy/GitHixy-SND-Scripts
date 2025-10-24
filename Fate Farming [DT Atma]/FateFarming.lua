@@ -3502,27 +3502,40 @@ function ExecuteBicolorExchange()
         elseif Addons.GetAddon("TelepotTown").Ready then
             Dalamud.Log("TelepotTown open")
             yield("/callback TelepotTown false -1")
-        elseif GetDistanceToPoint(SelectedBicolorExchangeData.position) > 5 then
-            Dalamud.Log("Distance to shopkeep is too far. Walking there.")
+            return
+        end
+        
+        -- Target the shopkeeper first, then navigate
+        if Svc.Targets.Target == nil or GetTargetName() ~= SelectedBicolorExchangeData.shopKeepName then
+            yield("/target "..SelectedBicolorExchangeData.shopKeepName)
+            yield("/wait 0.5")
+            return
+        end
+        
+        -- Check if we're close enough to interact
+        if GetDistanceToTarget() > 5 then
+            Dalamud.Log("Distance to shopkeep: "..tostring(GetDistanceToTarget())..", moving closer")
             if not (IPC.vnavmesh.PathfindInProgress() or IPC.vnavmesh.IsRunning()) then
-                Dalamud.Log("Path not running")
-                IPC.vnavmesh.PathfindAndMoveTo(SelectedBicolorExchangeData.position, false)
+                Dalamud.Log("Using vnav movetarget to reach shopkeeper")
+                yield("/vnav movetarget")
             end
+            return
         else
+            -- Close enough, stop movement and interact
             Dalamud.Log("[FATE] Arrived at Shopkeep")
             if IPC.vnavmesh.PathfindInProgress() or IPC.vnavmesh.IsRunning() then
                 yield("/vnav stop")
+                return
             end
     
-            if Svc.Targets.Target == nil or GetTargetName() ~= SelectedBicolorExchangeData.shopKeepName then
-                yield("/target "..SelectedBicolorExchangeData.shopKeepName)
-            elseif not Svc.Condition[CharacterCondition.occupiedInQuestEvent] then
+            if not Svc.Condition[CharacterCondition.occupiedInQuestEvent] then
                 yield("/interact")
             end
         end
     else
+        -- Gems below 1400, transaction complete
         if Addons.GetAddon("ShopExchangeCurrency").Ready then
-            Dalamud.Log("[FATE] Attemping to close shop window")
+            Dalamud.Log("[FATE] Attempting to close shop window")
             yield("/callback ShopExchangeCurrency true -1")
             return
         elseif Svc.Condition[CharacterCondition.occupiedInEvent] then
@@ -3531,6 +3544,16 @@ function ExecuteBicolorExchange()
             return
         end
 
+        -- Transaction complete, teleport back to farming zone
+        if Svc.ClientState.TerritoryType == SelectedBicolorExchangeData.zoneId then
+            local aetheryteName = ZoneManager:getReturnAetheryte()
+            if aetheryteName then
+                Dalamud.Log("[FATE] Bicolor exchange complete, returning to "..aetheryteName)
+                TeleportTo(aetheryteName)
+                yield("/wait 1")
+            end
+        end
+        
         ReturnToReady()
         return
     end
