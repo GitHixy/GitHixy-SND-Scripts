@@ -2742,11 +2742,25 @@ end
 function AutoBuyGysahlGreens()
     -- Check if we already have greens - exit state if we do
     if Inventory.GetItemCount(4868) > 0 then
-        Dalamud.Log("[FATE] Gysahl Greens acquired, closing shop")
+        Dalamud.Log("[FATE] Gysahl Greens detected in inventory!")
+        
+        -- Force close all menus
+        if Addons.GetAddon("SelectYesno").Ready then
+            yield("/callback SelectYesno true 1") -- Click No to close
+            yield("/wait 0.5")
+        end
         if Addons.GetAddon("Shop").Ready then
             yield("/callback Shop true -1")
             yield("/wait 0.5")
         end
+        if Addons.GetAddon("SelectIconString").Ready then
+            yield("/callback SelectIconString true -1")
+            yield("/wait 0.5")
+        end
+        
+        -- Clear target
+        yield("/target")
+        yield("/wait 0.3")
         
         -- Teleport back to farming zone
         if Svc.ClientState.TerritoryType ~= SelectedZone.zoneId then
@@ -2771,25 +2785,27 @@ function AutoBuyGysahlGreens()
     
     local gysahlGreensVendor = { position=Vector3(-62.1, 18.0, 9.4), npcName="Bango Zango" }
     
-    -- Handle confirmation dialog FIRST (appears after requesting quantity)
+    -- Handle confirmation dialog (appears after requesting quantity)
     if Addons.GetAddon("SelectYesno").Ready then
-        Dalamud.Log("[FATE] Confirming purchase of 99 Gysahl Greens")
-        yield("/callback SelectYesno true 0")
-        yield("/wait 1.5") -- Wait longer for purchase to complete
+        local itemCount = Inventory.GetItemCount(4868)
+        Dalamud.Log("[FATE] SelectYesno Ready. Current greens: "..itemCount)
+        Dalamud.Log("[FATE] Confirming purchase with Yes (0)")
+        yield("/callback SelectYesno true 0") -- 0 = Yes
+        yield("/wait 2") -- Wait for purchase to complete and inventory to update
         return
     end
     
     -- Handle shop menu
     if Addons.GetAddon("Shop").Ready then
-        Dalamud.Log("[FATE] Shop menu open, purchasing 99 Gysahl Greens")
-        yield("/callback Shop true 0 2 99")
-        yield("/wait 0.5")
+        Dalamud.Log("[FATE] Shop menu Ready, requesting 99 Gysahl Greens (item index 2)")
+        yield("/callback Shop true 0 2 99") -- 0=buy, 2=item index, 99=quantity
+        yield("/wait 1")
         return
     end
     
     -- Handle initial menu selection
     if Addons.GetAddon("SelectIconString").Ready then
-        Dalamud.Log("[FATE] Selecting shop option")
+        Dalamud.Log("[FATE] SelectIconString Ready, selecting first option")
         yield("/callback SelectIconString true 0")
         yield("/wait 0.5")
         return
