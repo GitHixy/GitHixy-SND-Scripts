@@ -2745,10 +2745,6 @@ function AutoBuyGysahlGreens()
         Dalamud.Log("[FATE] Gysahl Greens detected in inventory!")
         
         -- Force close all menus
-        if Addons.GetAddon("SelectYesno").Ready then
-            yield("/callback SelectYesno true 1") -- Click No to close
-            yield("/wait 0.5")
-        end
         if Addons.GetAddon("Shop").Ready then
             yield("/callback Shop true -1")
             yield("/wait 0.5")
@@ -2787,19 +2783,15 @@ function AutoBuyGysahlGreens()
     
     -- Handle confirmation dialog (appears after requesting quantity)
     if Addons.GetAddon("SelectYesno").Ready then
-        local itemCount = Inventory.GetItemCount(4868)
-        Dalamud.Log("[FATE] SelectYesno Ready. Current greens: "..itemCount)
-        
-        -- Close the Shop menu first to prevent it from reopening
-        if Addons.GetAddon("Shop").Ready then
-            Dalamud.Log("[FATE] Closing Shop menu before confirming")
-            yield("/callback Shop true -1")
-            yield("/wait 0.3")
-        end
-        
-        Dalamud.Log("[FATE] Confirming purchase with Yes (0)")
-        yield("/callback SelectYesno true 0") -- 0 = Yes
-        yield("/wait 2") -- Wait for purchase to complete and inventory to update
+        yield("/callback SelectYesno true 0")
+        return
+    end
+    
+    -- Handle shop menu
+    if Addons.GetAddon("Shop").Ready then
+        Dalamud.Log("[FATE] Shop menu Ready, purchasing 99 Gysahl Greens (item index 5)")
+        yield("/callback Shop true 0 5 99") -- 0=buy, 5=item index, 99=quantity
+        yield("/wait 1")
         return
     end
     
