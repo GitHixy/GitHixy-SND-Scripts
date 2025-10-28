@@ -2743,6 +2743,7 @@ function AutoBuyGysahlGreens()
     if Inventory.GetItemCount(4868) > 0 then -- don't need to buy
         if Addons.GetAddon("Shop").Ready then
             yield("/callback Shop true -1")
+            yield("/wait 0.5")
             return
         elseif Svc.ClientState.TerritoryType == SelectedZone.zoneId then
             yield("/item Gysahl Greens")
@@ -2760,6 +2761,15 @@ function AutoBuyGysahlGreens()
             return
         else
             local gysahlGreensVendor = { position=Vector3(-62.1, 18.0, 9.4), npcName="Bango Zango" }
+            
+            -- Handle confirmation dialog FIRST (appears after requesting quantity)
+            if Addons.GetAddon("SelectYesno").Ready then
+                Dalamud.Log("[FATE] Confirming purchase")
+                yield("/callback SelectYesno true 0")
+                yield("/wait 1")
+                return
+            end
+            
             if GetDistanceToPoint(gysahlGreensVendor.position) > 5 then
                 if not (IPC.vnavmesh.IsRunning() or IPC.vnavmesh.PathfindInProgress()) then
                     IPC.vnavmesh.PathfindAndMoveTo(gysahlGreensVendor.position, false)
@@ -2780,18 +2790,18 @@ function AutoBuyGysahlGreens()
             end
             
             -- Handle shop interactions
-            if Addons.GetAddon("SelectYesno").Ready then
-                yield("/callback SelectYesno true 0")
-                return
-            elseif Addons.GetAddon("SelectIconString").Ready then
+            if Addons.GetAddon("SelectIconString").Ready then
+                Dalamud.Log("[FATE] Selecting shop option")
                 yield("/callback SelectIconString true 0")
-                yield("/wait 0.5") -- Wait for shop menu to open
+                yield("/wait 0.5")
                 return
             elseif Addons.GetAddon("Shop").Ready then
+                Dalamud.Log("[FATE] Purchasing 99 Gysahl Greens")
                 yield("/callback Shop true 0 2 99")
-                yield("/wait 1")
+                yield("/wait 0.5")
                 return
             elseif not Svc.Condition[CharacterCondition.occupied] then
+                Dalamud.Log("[FATE] Interacting with vendor")
                 yield("/interact")
                 yield("/wait 1")
                 return
