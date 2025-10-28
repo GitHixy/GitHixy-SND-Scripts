@@ -2805,9 +2805,8 @@ function AutoBuyGysahlGreens()
     
     -- Handle shop menu
     if Addons.GetAddon("Shop").Ready then
-        Dalamud.Log("[FATE] Shop menu Ready, purchasing 99 Gysahl Greens (item ID 4868)")
-        -- Use item ID instead of index: Shop callback format is (type, itemId, quantity, unk)
-        yield("/callback Shop true 0 4868 99 0") -- 0=buy, 4868=item ID, 99=quantity, 0=unknown
+        Dalamud.Log("[FATE] Shop menu Ready, purchasing 99 Gysahl Greens (item index 5)")
+        yield("/callback Shop true 0 5 99") -- 0=buy, 5=item index, 99=quantity
         yield("/wait 1")
         return
     end
