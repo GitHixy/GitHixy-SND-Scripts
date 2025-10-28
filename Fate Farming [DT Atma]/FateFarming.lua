@@ -2743,11 +2743,14 @@ function AutoBuyGysahlGreens()
     if Inventory.GetItemCount(4868) > 0 then -- don't need to buy
         if Addons.GetAddon("Shop").Ready then
             yield("/callback Shop true -1")
+            return
         elseif Svc.ClientState.TerritoryType == SelectedZone.zoneId then
             yield("/item Gysahl Greens")
+            State = CharacterState.ready
+            Dalamud.Log("[FATE] State Change: Ready")
         else
             State = CharacterState.ready
-            Dalamud.Log("State Change: ready")
+            Dalamud.Log("[FATE] State Change: Ready")
         end
         return
     else
@@ -2761,24 +2764,37 @@ function AutoBuyGysahlGreens()
                 if not (IPC.vnavmesh.IsRunning() or IPC.vnavmesh.PathfindInProgress()) then
                     IPC.vnavmesh.PathfindAndMoveTo(gysahlGreensVendor.position, false)
                 end
-            elseif Svc.Targets.Target ~= nil and GetTargetName() == gysahlGreensVendor.npcName then
-                yield("/vnav stop")
-                if Addons.GetAddon("SelectYesno").Ready then
-                    yield("/callback SelectYesno true 0")
-                elseif Addons.GetAddon("SelectIconString").Ready then
-                    yield("/callback SelectIconString true 0")
-                    return
-                elseif Addons.GetAddon("Shop").Ready then
-                    yield("/callback Shop true 0 2 99")
-                    return
-                elseif not Svc.Condition[CharacterCondition.occupied] then
-                    yield("/interact")
-                    yield("/wait 1")
-                    return
-                end
-            else
+                return
+            end
+            
+            if Svc.Targets.Target == nil or GetTargetName() ~= gysahlGreensVendor.npcName then
                 yield("/vnav stop")
                 yield("/target "..gysahlGreensVendor.npcName)
+                return
+            end
+            
+            -- Target is set, stop movement
+            if IPC.vnavmesh.IsRunning() or IPC.vnavmesh.PathfindInProgress() then
+                yield("/vnav stop")
+                return
+            end
+            
+            -- Handle shop interactions
+            if Addons.GetAddon("SelectYesno").Ready then
+                yield("/callback SelectYesno true 0")
+                return
+            elseif Addons.GetAddon("SelectIconString").Ready then
+                yield("/callback SelectIconString true 0")
+                yield("/wait 0.5") -- Wait for shop menu to open
+                return
+            elseif Addons.GetAddon("Shop").Ready then
+                yield("/callback Shop true 0 2 99")
+                yield("/wait 1")
+                return
+            elseif not Svc.Condition[CharacterCondition.occupied] then
+                yield("/interact")
+                yield("/wait 1")
+                return
             end
         end
     end
