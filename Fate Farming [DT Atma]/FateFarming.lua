@@ -2740,73 +2740,92 @@ function SummonChocobo()
 end
 
 function AutoBuyGysahlGreens()
-    if Inventory.GetItemCount(4868) > 0 then -- don't need to buy
+    -- Check if we already have greens - exit state if we do
+    if Inventory.GetItemCount(4868) > 0 then
+        Dalamud.Log("[FATE] Gysahl Greens acquired, closing shop")
         if Addons.GetAddon("Shop").Ready then
             yield("/callback Shop true -1")
             yield("/wait 0.5")
-            return
-        elseif Svc.ClientState.TerritoryType == SelectedZone.zoneId then
-            yield("/item Gysahl Greens")
-            State = CharacterState.ready
-            Dalamud.Log("[FATE] State Change: Ready")
-        else
-            State = CharacterState.ready
-            Dalamud.Log("[FATE] State Change: Ready")
+        end
+        
+        -- Teleport back to farming zone
+        if Svc.ClientState.TerritoryType ~= SelectedZone.zoneId then
+            local aetheryteName = ZoneManager:getReturnAetheryte()
+            if aetheryteName then
+                Dalamud.Log("[FATE] Returning to "..aetheryteName)
+                TeleportTo(aetheryteName)
+            end
+        end
+        
+        State = CharacterState.ready
+        Dalamud.Log("[FATE] State Change: Ready")
+        return
+    end
+    
+    -- Need to buy greens
+    if Svc.ClientState.TerritoryType ~= 129 then
+        yield("/vnav stop")
+        TeleportTo("Limsa Lominsa Lower Decks")
+        return
+    end
+    
+    local gysahlGreensVendor = { position=Vector3(-62.1, 18.0, 9.4), npcName="Bango Zango" }
+    
+    -- Handle confirmation dialog FIRST (appears after requesting quantity)
+    if Addons.GetAddon("SelectYesno").Ready then
+        Dalamud.Log("[FATE] Confirming purchase of 99 Gysahl Greens")
+        yield("/callback SelectYesno true 0")
+        yield("/wait 1.5") -- Wait longer for purchase to complete
+        return
+    end
+    
+    -- Handle shop menu
+    if Addons.GetAddon("Shop").Ready then
+        Dalamud.Log("[FATE] Shop menu open, purchasing 99 Gysahl Greens")
+        yield("/callback Shop true 0 2 99")
+        yield("/wait 0.5")
+        return
+    end
+    
+    -- Handle initial menu selection
+    if Addons.GetAddon("SelectIconString").Ready then
+        Dalamud.Log("[FATE] Selecting shop option")
+        yield("/callback SelectIconString true 0")
+        yield("/wait 0.5")
+        return
+    end
+    
+    -- Navigate to vendor
+    if GetDistanceToPoint(gysahlGreensVendor.position) > 5 then
+        if not (IPC.vnavmesh.IsRunning() or IPC.vnavmesh.PathfindInProgress()) then
+            IPC.vnavmesh.PathfindAndMoveTo(gysahlGreensVendor.position, false)
         end
         return
-    else
-        if Svc.ClientState.TerritoryType ~=  129 then
-            yield("/vnav stop")
-            TeleportTo("Limsa Lominsa Lower Decks")
-            return
-        else
-            local gysahlGreensVendor = { position=Vector3(-62.1, 18.0, 9.4), npcName="Bango Zango" }
-            
-            -- Handle confirmation dialog FIRST (appears after requesting quantity)
-            if Addons.GetAddon("SelectYesno").Ready then
-                Dalamud.Log("[FATE] Confirming purchase")
-                yield("/callback SelectYesno true 0")
-                yield("/wait 1")
-                return
-            end
-            
-            if GetDistanceToPoint(gysahlGreensVendor.position) > 5 then
-                if not (IPC.vnavmesh.IsRunning() or IPC.vnavmesh.PathfindInProgress()) then
-                    IPC.vnavmesh.PathfindAndMoveTo(gysahlGreensVendor.position, false)
-                end
-                return
-            end
-            
-            if Svc.Targets.Target == nil or GetTargetName() ~= gysahlGreensVendor.npcName then
-                yield("/vnav stop")
-                yield("/target "..gysahlGreensVendor.npcName)
-                return
-            end
-            
-            -- Target is set, stop movement
-            if IPC.vnavmesh.IsRunning() or IPC.vnavmesh.PathfindInProgress() then
-                yield("/vnav stop")
-                return
-            end
-            
-            -- Handle shop interactions
-            if Addons.GetAddon("SelectIconString").Ready then
-                Dalamud.Log("[FATE] Selecting shop option")
-                yield("/callback SelectIconString true 0")
-                yield("/wait 0.5")
-                return
-            elseif Addons.GetAddon("Shop").Ready then
-                Dalamud.Log("[FATE] Purchasing 99 Gysahl Greens")
-                yield("/callback Shop true 0 2 99")
-                yield("/wait 0.5")
-                return
-            elseif not Svc.Condition[CharacterCondition.occupied] then
-                Dalamud.Log("[FATE] Interacting with vendor")
-                yield("/interact")
-                yield("/wait 1")
-                return
-            end
-        end
+    end
+    
+    -- Stop movement when close
+    if IPC.vnavmesh.IsRunning() or IPC.vnavmesh.PathfindInProgress() then
+        yield("/vnav stop")
+        yield("/wait 0.5")
+        return
+    end
+    
+    -- Target vendor if not already targeted
+    if Svc.Targets.Target == nil or GetTargetName() ~= gysahlGreensVendor.npcName then
+        yield("/target "..gysahlGreensVendor.npcName)
+        yield("/wait 0.5")
+        return
+    end
+    
+    -- Interact with vendor if not occupied and no menus open
+    if not Svc.Condition[CharacterCondition.occupied] and 
+       not Addons.GetAddon("SelectIconString").Ready and
+       not Addons.GetAddon("Shop").Ready and
+       not Addons.GetAddon("SelectYesno").Ready then
+        Dalamud.Log("[FATE] Interacting with Bango Zango")
+        yield("/interact")
+        yield("/wait 1")
+        return
     end
 end
 
