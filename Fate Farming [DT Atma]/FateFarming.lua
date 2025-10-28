@@ -2789,6 +2789,14 @@ function AutoBuyGysahlGreens()
     if Addons.GetAddon("SelectYesno").Ready then
         local itemCount = Inventory.GetItemCount(4868)
         Dalamud.Log("[FATE] SelectYesno Ready. Current greens: "..itemCount)
+        
+        -- Close the Shop menu first to prevent it from reopening
+        if Addons.GetAddon("Shop").Ready then
+            Dalamud.Log("[FATE] Closing Shop menu before confirming")
+            yield("/callback Shop true -1")
+            yield("/wait 0.3")
+        end
+        
         Dalamud.Log("[FATE] Confirming purchase with Yes (0)")
         yield("/callback SelectYesno true 0") -- 0 = Yes
         yield("/wait 2") -- Wait for purchase to complete and inventory to update
