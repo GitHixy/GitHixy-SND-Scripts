@@ -1,7 +1,7 @@
 --[=====[
 [[SND Metadata]]
 author: GitHixy (based on pot0to's 3.0.9)
-version: 3.2.0
+version: 3.2.1
 description: >-
   Fate farming script with the following features:
 
@@ -176,6 +176,10 @@ configs:
     default: "Urqopacha,Kozama'uka,Yak T'el,Shaaloani,Heritage Found,Living Memory"
     type: string
     description: Comma-separated list of zone names to cycle through. Leave empty to use all DT zones.
+  Auto Restart on Error?:
+    default: true
+    type: boolean
+    description: Automatically restart the script if a random Lua error occurs. Useful to prevent interruptions during farming.
 [[End Metadata]]
 --]=====]
 --[[
@@ -184,6 +188,12 @@ configs:
 *                                  Changelog                                   *
 ********************************************************************************
 
+    -> 3.2.1    By GitHixy.
+                Added automatic script restart on Lua errors to prevent interruptions during farming.
+                New metadata option: "Auto Restart on Error?" - automatically restarts the script when a random Lua error occurs.
+                Maximum 10 restart attempts with 3-second cooldown between restarts to prevent infinite loops.
+                Added comprehensive error logging and user notifications for restart events.
+                Fixed nil comparison errors in Progress checks (nearestFate.Progress and CurrentFate.fateObject.Progress).
     -> 3.2.0    By GitHixy.
                 Added Multi Zone Farming mode: automatically cycles through zones when no eligible FATEs found.
                 New metadata options: "Enable Multi Zone Farming?" and "Multi Zone List".
@@ -4060,6 +4070,12 @@ ReturnOnDeath = Config.Get("Return on death?")
 
 Echo = Config.Get("Echo logs")
 
+-- Auto Restart on Error Settings
+AutoRestartOnError = Config.Get("Auto Restart on Error?")
+if AutoRestartOnError == nil then
+    AutoRestartOnError = true  -- Default to true
+end
+
 -- Atma Farming Settings
 EnableAtmaFarming = Config.Get("Enable Atma Farming?")
 TargetAtmaPerZone = Config.Get("Target Atma per Zone")
@@ -4191,32 +4207,40 @@ if ShouldExchangeBicolorGemstones ~= false then
     end
 end
 
-State = CharacterState.ready
-CurrentFate = nil
-if InActiveFate() then
-    CurrentFate = BuildFateTable(Fates.GetNearestFate())
-end
+--#region Auto-Restart Error Handler
 
-if ShouldSummonChocobo and GetBuddyTimeRemaining() > 0 then
-    yield('/cac "'..ChocoboStance..' stance"')
-end
+-- Error handler function
+ScriptRestartCount = 0
+MaxRestartAttempts = 10
+LastErrorMessage = nil
 
--- Log active farming mode using ZoneManager
-if ZoneManager.currentMode == FarmingMode.ATMA then
-    Dalamud.Log("[FATE] Atma Farming Mode: ACTIVE")
-    if Echo == "All" then
-        yield("/echo [FATE] Atma Farming Mode: Enabled")
+function MainScriptLoop()
+    State = CharacterState.ready
+    CurrentFate = nil
+    if InActiveFate() then
+        CurrentFate = BuildFateTable(Fates.GetNearestFate())
     end
-elseif ZoneManager.currentMode == FarmingMode.MULTI_ZONE then
-    Dalamud.Log("[FATE] Multi Zone Farming Mode: ACTIVE ("..tostring(#ZoneManager.multiZoneList).." zones)")
-    if Echo == "All" then
-        yield("/echo [FATE] Multi Zone Farming Mode: Enabled with "..tostring(#ZoneManager.multiZoneList).." zones")
-    end
-else
-    Dalamud.Log("[FATE] Standard Single Zone Farming Mode")
-end
 
-while not StopScript do
+    if ShouldSummonChocobo and GetBuddyTimeRemaining() > 0 then
+        yield('/cac "'..ChocoboStance..' stance"')
+    end
+
+    -- Log active farming mode using ZoneManager
+    if ZoneManager.currentMode == FarmingMode.ATMA then
+        Dalamud.Log("[FATE] Atma Farming Mode: ACTIVE")
+        if Echo == "All" then
+            yield("/echo [FATE] Atma Farming Mode: Enabled")
+        end
+    elseif ZoneManager.currentMode == FarmingMode.MULTI_ZONE then
+        Dalamud.Log("[FATE] Multi Zone Farming Mode: ACTIVE ("..tostring(#ZoneManager.multiZoneList).." zones)")
+        if Echo == "All" then
+            yield("/echo [FATE] Multi Zone Farming Mode: Enabled with "..tostring(#ZoneManager.multiZoneList).." zones")
+        end
+    else
+        Dalamud.Log("[FATE] Standard Single Zone Farming Mode")
+    end
+
+    while not StopScript do
     local nearestFate = Fates.GetNearestFate()
     if not IPC.vnavmesh.IsReady() then
         yield("/echo [FATE] Waiting for vnavmesh to build...")
@@ -4270,9 +4294,68 @@ while not StopScript do
     end
     yield("/wait 0.1")
 end
-yield("/vnav stop")
+    yield("/vnav stop")
 
-if Player.Job.Id ~= MainClass.Id then
-    yield("/gs change "..MainClass.Name)
-end
+    if Player.Job.Id ~= MainClass.Id then
+        yield("/gs change "..MainClass.Name)
+    end
+end -- End of MainScriptLoop function
+
+--#endregion
+
+-- Main execution with error handling
+repeat
+    local success, errorMessage = pcall(MainScriptLoop)
+    
+    if not success then
+        ScriptRestartCount = ScriptRestartCount + 1
+        LastErrorMessage = tostring(errorMessage)
+        
+        Dalamud.Log("[ERROR] Script crashed with error: "..LastErrorMessage)
+        Dalamud.Log("[ERROR] Restart attempt "..ScriptRestartCount.."/"..MaxRestartAttempts)
+        
+        if AutoRestartOnError and ScriptRestartCount < MaxRestartAttempts then
+            yield("/echo [FATE] ⚠️ Lua error detected. Auto-restarting... (Attempt "..ScriptRestartCount.."/"..MaxRestartAttempts..")")
+            yield("/echo [FATE] Error: "..LastErrorMessage)
+            
+            -- Stop any running navigation
+            yield("/vnav stop")
+            
+            -- Clear target
+            if Svc.Targets.Target ~= nil then
+                ClearTarget()
+            end
+            
+            -- Turn off combat mods before restarting
+            if CombatModsOn then
+                TurnOffCombatMods()
+            end
+            
+            -- Wait a bit before restarting to avoid rapid loops
+            yield("/wait 3")
+            
+            Dalamud.Log("[RESTART] Restarting script after error...")
+            yield("/echo [FATE] 🔄 Script restarting...")
+            
+            -- Reset some state variables
+            State = CharacterState.ready
+            CurrentFate = nil
+            StopScript = false
+            
+        else
+            if ScriptRestartCount >= MaxRestartAttempts then
+                yield("/echo [FATE] ❌ Maximum restart attempts reached ("..MaxRestartAttempts.."). Script stopped.")
+                Dalamud.Log("[ERROR] Maximum restart attempts reached. Script stopped.")
+            elseif not AutoRestartOnError then
+                yield("/echo [FATE] ❌ Auto-restart disabled. Script stopped.")
+                Dalamud.Log("[ERROR] Auto-restart disabled. Script stopped.")
+            end
+            StopScript = true
+        end
+    end
+until StopScript or not AutoRestartOnError
+
+-- Final cleanup
+yield("/vnav stop")
+Dalamud.Log("[FATE] Script terminated. Total restarts: "..ScriptRestartCount)
 --#endregion Main
