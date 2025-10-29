@@ -1201,7 +1201,7 @@ function ZoneManager:shouldSwitchZone()
         local currentZone = Svc.ClientState.TerritoryType
         local atmaZone = self:getAtmaZoneData(currentZone)
         
-        if not atmaZone then
+            if atmaZone == nil then
             return false
         end
         
@@ -2682,7 +2682,7 @@ function CollectionsFateTurnIn()
         yield("/interact")
         yield("/wait 3")
 
-        if CurrentFate.fateObject.Progress < 100 then
+        if CurrentFate.fateObject.Progress ~= nil and CurrentFate.fateObject.Progress < 100 then
             TurnOnCombatMods()
             State = CharacterState.doFate
             Dalamud.Log("[FATE] State Change: DoFate")
@@ -3012,7 +3012,7 @@ function HandleUnexpectedCombat()
     TurnOnCombatMods("manual")
 
     local nearestFate = Fates.GetNearestFate()
-    if InActiveFate() and nearestFate.Progress < 100 then
+    if InActiveFate() and nearestFate ~= nil and nearestFate.Progress ~= nil and nearestFate.Progress < 100 then
         CurrentFate = BuildFateTable(nearestFate)
         State = CharacterState.doFate
         Dalamud.Log("[FATE] State Change: DoFate")
