@@ -3899,8 +3899,13 @@ end
 
 function FoodCheck()
     --food usage
-    if not HasStatusId(48) and Food ~= "" then
-        yield("/item " .. Food)
+    if Food ~= "" then
+        local hasWellFed = HasStatusId(48)
+        Dalamud.Log("[FATE] Food check: Food='"..Food.."', HasWellFed="..tostring(hasWellFed))
+        if not hasWellFed then
+            Dalamud.Log("[FATE] Using food: "..Food)
+            yield("/item " .. Food)
+        end
     end
 end
 
