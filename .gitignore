@@ -1,3 +1,6 @@
 # Reference files (not to be committed)
 vac_functions.lua
 vac_lists.lua
+
+# Dalamud API documentation (keep updated but don't commit)
+DALAMUD_API_REFERENCE.md
