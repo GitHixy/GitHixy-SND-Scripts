@@ -1,9 +1,11 @@
 --[=====[
 [[SND Metadata]]
 author: GitHixy (based on pot0to's 3.0.9)
-version: 3.1.0
+version: 3.2.0
 description: >-
   Fate farming script with the following features:
+
+  - Multi-Zone Dawntrail Farming Mode: automatically cycles through zones when no eligible FATEs found.
 
   - Integrated Dawntrail Demiatma farming with automatic zone switching
 
@@ -188,6 +190,7 @@ configs:
                 Mutual exclusivity: Atma Farming and Multi Zone Farming cannot be enabled simultaneously.
                 Improved aetheryte navigation logic inspired by baanderson's implementation.
                 Fixed broken condition checks in Ready() that prevented aetheryte navigation.
+                Fixed errors on Gyshal Greens purchase at Limsa vendor.
     -> 3.1.0    By GitHixy.
                 Integrated Dawntrail Demiatma farming directly into the main script.
                 Added automatic zone switching when target Demiatma count is reached.
