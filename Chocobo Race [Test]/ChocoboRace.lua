@@ -1,23 +1,25 @@
 --[=====[
 [[SND Metadata]]
 author: GitHixy
-version: 2.0.0
+version: 2.1.0
 description: >-
-  Auto Chocobo Train & Race script with the following features:
+  Automated Chocobo Training & Racing script with comprehensive features:
 
-  - Automatically trains Chocobo if training sessions are available before racing
+  - Automatic training when sessions are available before racing
 
-  - Purchases training food automatically based on user selection (Grade 1 only)
+  - Smart food purchasing system for all feed types (Grade 1)
 
-  - Continuous training and racing until desired rank is reached
+  - Continuous training and racing until target rank is achieved
 
-  - Supports multiple feed types: Speed, Acceleration, Endurance, Stamina, and Balance
+  - Multi-feed support: Speed, Acceleration, Endurance, Stamina, Balance
 
-  - Integrates Chocobo Dash ability during races
+  - Enhanced race logic with Chocobo Dash ability integration
 
-  - Improved targeting logic for Chocobo Trainer NPC
+  - Robust error handling and auto-restart functionality
 
-  Note: This script is more about convenience than competitiveness, so don't expect first place every time!
+  - Improved NPC targeting and interaction reliability
+
+  Note: Optimized for convenience and consistency rather than competitive racing performance.
 
 plugin_dependencies:
 - Lifestream
@@ -26,7 +28,7 @@ plugin_dependencies:
 configs:
   Feed Type:
     default: "Speed"
-    description: Choose which stat to train
+    description: Choose which stat to train your Chocobo
     type: list
     required: true
     is_choice: true
@@ -38,7 +40,7 @@ configs:
         - Balance
   Move Forward Key:
     default: "W"
-    description: Key for moving forward during the race. Change to your desired move forward key.
+    description: Key for moving forward during races. Customize to match your keybind settings.
     type: string
     required: true
   Target Rank:
@@ -47,7 +49,25 @@ configs:
     min: 1
     max: 50
     required: true
-    description: The rank your Chocobo will aim to achieve before the script stops.
+    description: Target Chocobo rank to achieve before script completion.
+  Auto Restart on Error?:
+    default: true
+    type: boolean
+    description: Automatically restart the script when Lua errors occur to prevent interruptions.
+  Enable Debug Logging?:
+    default: false
+    type: boolean
+    description: Enable detailed debug logging for troubleshooting purposes.
+  Echo Messages:
+    default: "All"
+    description: Control script message output frequency
+    type: list
+    required: true
+    is_choice: true
+    choices:
+        - All
+        - Important
+        - None
 [[End Metadata]]
 --]=====]
 --[[
@@ -56,6 +76,13 @@ configs:
 *                                  Changelog                                   *
 ********************************************************************************
 
+    -> 2.1.0    By GitHixy.
+                Added comprehensive error handling and auto-restart functionality.
+                New metadata options: "Auto Restart on Error?", "Enable Debug Logging?", "Echo Messages".
+                Enhanced logging system with debug mode and configurable message output.
+                Improved script reliability with automatic recovery from Lua errors.
+                Added comprehensive nil-safety checks and validation throughout the script.
+                Enhanced NPC interaction reliability with better retry mechanisms.
     -> 2.0.0    By GitHixy.
                 Updated for SND v2 with full metadata support.
                 Replaced all old API calls with new SND v2 functions.
@@ -98,12 +125,91 @@ Plugins that are needed for it to work:
 local feed_type = Config.GetString("Feed Type")
 local move_forward_key = Config.GetString("Move Forward Key")
 local target_rank = Config.GetInt("Target Rank")
+local auto_restart_on_error = Config.GetBool("Auto Restart on Error?")
+local enable_debug_logging = Config.GetBool("Enable Debug Logging?")
+local echo_messages = Config.GetString("Echo Messages")
 
---Declarations
+-- Script State Variables
 chocoboRaceScript = true
 ChocoboRaceID = 21
+StopScript = false
+
+-- Error Handling Variables
+ScriptRestartCount = 0
+MaxRestartAttempts = 10
+LastErrorMessage = ""
 
 --#endregion Configuration
+
+--#region Utility Functions
+
+-- Enhanced logging function
+function LogInfo(message, isImportant)
+    isImportant = isImportant or false
+    Dalamud.Log("[CHOCOBO] "..tostring(message))
+    
+    if echo_messages == "All" or (echo_messages == "Important" and isImportant) then
+        yield("/echo [CHOCOBO] "..tostring(message))
+    end
+end
+
+function LogDebug(message)
+    if enable_debug_logging then
+        Dalamud.Log("[CHOCOBO-DEBUG] "..tostring(message))
+        if echo_messages == "All" then
+            yield("/echo [CHOCOBO-DEBUG] "..tostring(message))
+        end
+    end
+end
+
+function LogError(message)
+    Dalamud.Log("[CHOCOBO-ERROR] "..tostring(message))
+    if echo_messages ~= "None" then
+        yield("/echo [CHOCOBO-ERROR] "..tostring(message))
+    end
+end
+
+-- Safe execution wrapper
+function SafeCall(funcName, func, ...)
+    LogDebug("Executing function: "..funcName)
+    local success, result = pcall(func, ...)
+    if not success then
+        LogError("Function "..funcName.." failed: "..tostring(result))
+        return false, result
+    end
+    LogDebug("Function "..funcName.." completed successfully")
+    return true, result
+end
+
+-- Validation functions
+function ValidateTarget(expectedName)
+    if not HasTarget() then
+        return false, "No target selected"
+    end
+    
+    local currentName = GetTargetName()
+    if currentName ~= expectedName then
+        return false, "Expected '"..expectedName.."' but got '"..currentName.."'"
+    end
+    
+    return true, nil
+end
+
+function ValidateAddon(addonName, shouldBeReady)
+    shouldBeReady = shouldBeReady or false
+    
+    if shouldBeReady and not IsAddonReady(addonName) then
+        return false, "Addon '"..addonName.."' is not ready"
+    end
+    
+    if not shouldBeReady and not IsAddonVisible(addonName) then
+        return false, "Addon '"..addonName.."' is not visible"
+    end
+    
+    return true, nil
+end
+
+--#endregion Utility Functions
 
 --#region SND v2 Helper Functions
 
@@ -195,17 +301,43 @@ end
 
 -- Function to ensure Gold Saucer Tab is open
 function open_gold_saucer_tab()
+    LogDebug("Opening Gold Saucer tab")
+    
     if not IsAddonReady("GoldSaucerInfo") then
         yield("/goldsaucer")
-        yield("/wait 2")  -- Wait for the Gold Saucer tab to open
+        yield("/wait 2")
+        
+        -- Validate the tab opened
+        local attempts = 0
+        while not IsAddonReady("GoldSaucerInfo") and attempts < 5 do
+            yield("/wait 1")
+            attempts = attempts + 1
+            LogDebug("Waiting for GoldSaucerInfo addon... attempt "..attempts)
+        end
+        
+        if not IsAddonReady("GoldSaucerInfo") then
+            LogError("Failed to open Gold Saucer tab after 5 attempts")
+            return false
+        end
+        
         yield("/callback GoldSaucerInfo true 0 1 119 0 0")
         yield("/wait 2")
     end
+    
+    LogDebug("Gold Saucer tab is ready")
+    return true
 end
 
 -- Get the initial rank of the Chocobo and training information
 function get_chocobo_info()
-    open_gold_saucer_tab()
+    LogDebug("Retrieving Chocobo information")
+    
+    local success = open_gold_saucer_tab()
+    if not success then
+        LogError("Failed to open Gold Saucer tab")
+        return nil, nil, nil
+    end
+    
     yield("/wait 1")
     
     local rank = tonumber(GetNodeText("GoldSaucerInfo", 16)) or 0
@@ -214,84 +346,158 @@ function get_chocobo_info()
 
     if IsAddonReady("GSInfoChocoboParam") then
         trainingSessionsAvailable = tonumber(GetNodeText("GSInfoChocoboParam", 9, 0)) or 0
+        LogDebug("Found GSInfoChocoboParam addon, training sessions: "..trainingSessionsAvailable)
     else
-        yield("/echo Warning: GSInfoChocoboParam not ready. Defaulting training sessions to 0.")
+        LogError("GSInfoChocoboParam not ready. Defaulting training sessions to 0.")
     end
 
+    LogInfo("Chocobo '"..name.."' - Rank: "..rank.." - Training Sessions: "..trainingSessionsAvailable, true)
     return rank, name, trainingSessionsAvailable
 end
 
 -- Function to teleport to the specified aetheryte
 function Teleport(aetheryteName)
+    LogInfo("Teleporting to "..aetheryteName)
+    
     yield("/tp " .. aetheryteName)
     
-    -- Wait until the teleport is completed
-    while not GetCharacterCondition(45) do
+    -- Wait until the teleport starts (with timeout)
+    local timeout = 0
+    while not GetCharacterCondition(45) and timeout < 100 do
         yield("/wait 0.1")
+        timeout = timeout + 1
+    end
+    
+    if timeout >= 100 then
+        LogError("Teleport to "..aetheryteName.." failed to start")
+        return false
     end
 
-    -- Wait for a short delay to ensure the character finishes the teleport animation
-    while GetCharacterCondition(45) do
+    -- Wait for teleport to complete (with timeout)
+    timeout = 0
+    while GetCharacterCondition(45) and timeout < 200 do
         yield("/wait 0.1")
+        timeout = timeout + 1
     end
-    yield("/echo Teleport to " .. aetheryteName .. " completed.")
+    
+    if timeout >= 200 then
+        LogError("Teleport to "..aetheryteName.." timed out")
+        return false
+    end
+    
+    LogInfo("Teleport to "..aetheryteName.." completed", true)
+    return true
 end
 
 -- Function to navigate to Gold Saucer training NPC
 function path_to_gold_saucer_training_npc()
-    yield("/echo Initiating pathing to Gold Saucer training NPC...")
+    LogInfo("Navigating to Gold Saucer training NPC...")
 
     -- Step 1: Teleport to Gold Saucer if not already in zone 144 or 388
-    zone = GetZoneID()
+    local zone = GetZoneID()
+    LogDebug("Current zone ID: "..zone)
 
     if zone ~= 144 and zone ~= 388 then
-        Teleport("Gold Saucer")
+        local success = Teleport("Gold Saucer")
+        if not success then
+            LogError("Failed to teleport to Gold Saucer")
+            return false
+        end
     end
 
     -- Step 2: Move to the Aetheryte and attune if needed
     yield("/target Aetheryte")
     if not HasTarget() or GetTargetName() ~= "Aetheryte" or GetDistanceToTarget() > 7 then
-        yield("/echo Moving to Aetheryte...")
+        LogInfo("Moving to Aetheryte...")
         PathfindAndMoveTo(-4.82, 1.04, 2.21) 
-        while PathIsRunning() or PathfindInProgress() do
+        
+        local timeout = 0
+        while (PathIsRunning() or PathfindInProgress()) and timeout < 300 do
             yield("/wait 1")
+            timeout = timeout + 1
+        end
+        
+        if timeout >= 300 then
+            LogError("Timeout waiting for pathfinding to Aetheryte")
+            return false
         end
     end
 
     -- Step 3: If near the Aetheryte, select "Chocobo Square"
-    if GetDistanceToTarget() <= 7 then
+    if HasTarget() and GetDistanceToTarget() <= 7 then
         yield("/vnav stop")
+        LogInfo("Using Lifestream to go to Chocobo Square")
         yield("/li Chocobo Square")
         yield("/wait 3")
+    else
+        LogError("Could not reach Aetheryte")
+        return false
     end
 
     -- Step 4: Path to the training NPC
+    LogDebug("Pathing to Tack & Feed Trader")
     PathfindAndMoveTo(-7.57, -1.78, -67.54)  
-    while PathIsRunning() or PathfindInProgress() do
+    
+    local timeout = 0
+    while (PathIsRunning() or PathfindInProgress()) and timeout < 300 do
         yield("/wait 1")
+        timeout = timeout + 1
+    end
+    
+    if timeout >= 300 then
+        LogError("Timeout waiting for pathfinding to NPC")
+        return false
     end
 
     -- Step 5: Target and interact with the NPC
-    repeat
+    local attempts = 0
+    while attempts < 10 do
         yield("/target Tack & Feed Trader")
-        yield("/wait 0.1")
-    until HasTarget() and GetTargetName() == "Tack & Feed Trader"
+        yield("/wait 0.5")
+        
+        if HasTarget() and GetTargetName() == "Tack & Feed Trader" then
+            break
+        end
+        
+        attempts = attempts + 1
+        LogDebug("Targeting NPC attempt "..attempts)
+    end
+    
+    if not (HasTarget() and GetTargetName() == "Tack & Feed Trader") then
+        LogError("Failed to target Tack & Feed Trader after 10 attempts")
+        return false
+    end
 
-    repeat
+    -- Interact with NPC
+    attempts = 0
+    while attempts < 10 do
         yield("/interact")
-        yield("/wait 0.2")
-    until IsAddonVisible("SelectIconString")
+        yield("/wait 0.5")
+        
+        if IsAddonVisible("SelectIconString") then
+            break
+        end
+        
+        attempts = attempts + 1
+        LogDebug("Interaction attempt "..attempts)
+    end
+    
+    if not IsAddonVisible("SelectIconString") then
+        LogError("Failed to open SelectIconString after 10 attempts")
+        return false
+    end
 
     -- Select the first item in the menu to enter the correct NPC interface
     yield("/click SelectIconString Entry1")
     yield("/wait 1")
 
-    yield("/echo Pathing completed. Ready to interact with NPC for training.")
+    LogInfo("Successfully navigated to training NPC")
+    return true
 end
 
 -- Function to buy food for training based on user-selected feed type
 function buy_training_food(training_sessions_available)
-    yield("/echo Starting the process of buying " .. feed_type .. " for " .. training_sessions_available .. " training sessions.")
+    LogInfo("Buying "..feed_type.." food for "..training_sessions_available.." training sessions")
 
     -- Define feed type options and callback values
     local feed_callbacks = {
@@ -304,37 +510,77 @@ function buy_training_food(training_sessions_available)
 
     -- Check if the feed type is valid
     if not feed_callbacks[feed_type] then
-        yield("/echo Error: Invalid feed type selected. Please choose from Speed, Acceleration, Endurance, Stamina, or Balance.")
-        return
+        LogError("Invalid feed type selected: "..feed_type..". Valid types: Speed, Acceleration, Endurance, Stamina, Balance")
+        return false
+    end
+    
+    -- Validate we have shop interface open
+    if not IsAddonVisible("Shop") then
+        LogError("Shop interface is not open")
+        return false
     end
 
     -- Buy the specified feed in the required quantity
     local purchase_command = feed_callbacks[feed_type] .. tostring(training_sessions_available) .. " 0"
+    LogDebug("Executing purchase command: "..purchase_command)
     yield(purchase_command)
     yield("/wait 2")
 
-    -- Confirm purchase
+    -- Wait for confirmation dialog and confirm purchase
+    local timeout = 0
+    while not IsAddonVisible("SelectYesno") and timeout < 50 do
+        yield("/wait 0.1")
+        timeout = timeout + 1
+    end
+    
+    if not IsAddonVisible("SelectYesno") then
+        LogError("Purchase confirmation dialog did not appear")
+        return false
+    end
+
     yield("/click SelectYesno Yes")
     yield("/wait 1")
-    yield("/callback Shop true -1")
     
-    yield("/echo Successfully bought " .. training_sessions_available .. " units of " .. feed_type .. " Blend.")
+    -- Close shop
+    yield("/callback Shop true -1")
+    yield("/wait 1")
+    
+    LogInfo("Successfully purchased "..training_sessions_available.." units of "..feed_type.." Blend")
+    return true
 end
 
 -- Function to repeat training based on the remaining sessions
 function repeat_training(remaining_sessions, chocobo_name)
-    while remaining_sessions > 0 do
-        -- Proceed to the Race Chocobo Trainer for each session
-        yield("/echo Remaining training sessions: " .. remaining_sessions)
-        path_to_race_chocobo_trainer()
+    LogInfo("Starting "..remaining_sessions.." training sessions for '"..chocobo_name.."'")
+    
+    local completed_sessions = 0
+    
+    while remaining_sessions > 0 and not StopScript do
+        LogInfo("Training session "..(completed_sessions + 1).." - Remaining: "..remaining_sessions)
+        
+        local success = path_to_race_chocobo_trainer()
+        if not success then
+            LogError("Failed to complete training session "..(completed_sessions + 1))
+            return false
+        end
 
         -- Decrement the number of available sessions
         remaining_sessions = remaining_sessions - 1
+        completed_sessions = completed_sessions + 1
 
-        yield("/echo Completed one training session for Chocobo '" .. chocobo_name .. "'. Remaining sessions: " .. remaining_sessions)
+        LogInfo("Completed training session "..completed_sessions.." for '"..chocobo_name.."'")
+        
+        -- Small delay between sessions
+        yield("/wait 1")
     end
 
-    yield("/echo All training sessions for Chocobo '" .. chocobo_name .. "' have been completed.")
+    if remaining_sessions == 0 then
+        LogInfo("All "..completed_sessions.." training sessions completed for '"..chocobo_name.."'", true)
+        return true
+    else
+        LogError("Training incomplete due to script stop")
+        return false
+    end
 end
 
 -- Function to path to the Race Chocobo Trainer and interact
@@ -560,34 +806,130 @@ end
 
 -- Function to check and train Chocobo, then race if training is done
 function check_and_train_chocobo_then_race()
-    current_rank, chocobo_name, training_sessions_available = get_chocobo_info()
+    LogDebug("Starting check_and_train_chocobo_then_race function")
+    
+    local current_rank, chocobo_name, training_sessions_available = get_chocobo_info()
+    
+    -- Validate that we got valid info
+    if not current_rank or not chocobo_name then
+        LogError("Failed to retrieve Chocobo information")
+        return false
+    end
 
-    -- Echo the Chocobo info
-    yield("/echo Current Chocobo: '" .. chocobo_name .. "' Rank: " .. current_rank .. " Training Sessions Available: " .. training_sessions_available)
+    -- Check if we've reached target rank
+    if current_rank >= target_rank then
+        LogInfo("Chocobo '"..chocobo_name.."' has reached target rank "..target_rank.."! Script completed.", true)
+        chocoboRaceScript = false
+        return true
+    end
 
     -- Check if training sessions are available
-    if training_sessions_available > 0 then
-        yield("/echo Training sessions available for Chocobo '" .. chocobo_name .. "'. Preparing to go to the Gold Saucer.")
+    if training_sessions_available and training_sessions_available > 0 then
+        LogInfo("Training "..training_sessions_available.." sessions for Chocobo '"..chocobo_name.."'", true)
         
         -- Pathing logic to navigate to the NPC
-        path_to_gold_saucer_training_npc()
+        local success = path_to_gold_saucer_training_npc()
+        if not success then
+            LogError("Failed to navigate to training NPC")
+            return false
+        end
 
         -- Logic to buy food for training
-        buy_training_food(training_sessions_available)
+        success = buy_training_food(training_sessions_available)
+        if not success then
+            LogError("Failed to buy training food")
+            return false
+        end
 
         -- Proceed to repeat training for the remaining sessions
-        repeat_training(training_sessions_available, chocobo_name)
+        success = repeat_training(training_sessions_available, chocobo_name)
+        if not success then
+            LogError("Failed to complete training sessions")
+            return false
+        end
+    else
+        LogInfo("No training sessions available for '"..chocobo_name.."'. Proceeding to race.")
     end
 
     -- After training, or if no training sessions, start the race
-    start_chocobo_race()
+    local success = start_chocobo_race()
+    if not success then
+        LogError("Failed to start or complete race")
+        return false
+    end
+    
+    return true
 end
+
+--#endregion Main Functions
 
 --#endregion Main Functions
 
 --#region Script Entry Point
 
--- Start the entire process
-check_and_train_chocobo_then_race()
+-- Main script loop with error handling
+function MainChocoboScript()
+    LogInfo("=== Chocobo Racing Script Started ===", true)
+    LogInfo("Target Rank: "..target_rank.." | Feed Type: "..feed_type.." | Forward Key: "..move_forward_key)
+    
+    while chocoboRaceScript and not StopScript do
+        local success, error = SafeCall("check_and_train_chocobo_then_race", check_and_train_chocobo_then_race)
+        
+        if not success then
+            LogError("Main script function failed: "..tostring(error))
+            if auto_restart_on_error then
+                LogError("Auto-restart is enabled, but this error requires manual intervention")
+            end
+            StopScript = true
+            break
+        end
+        
+        -- Small delay to prevent tight loops
+        yield("/wait 1")
+    end
+    
+    LogInfo("=== Chocobo Racing Script Ended ===", true)
+end
+
+-- Main execution with error handling wrapper
+if auto_restart_on_error then
+    LogInfo("Auto-restart enabled with max "..MaxRestartAttempts.." attempts")
+    
+    local function RunWithErrorHandling()
+        local success, errorMsg = pcall(MainChocoboScript)
+        
+        if not success and auto_restart_on_error then
+            ScriptRestartCount = ScriptRestartCount + 1
+            LastErrorMessage = tostring(errorMsg)
+            
+            LogError("Script crashed with error: "..LastErrorMessage)
+            LogError("Restart attempt "..ScriptRestartCount.."/"..MaxRestartAttempts)
+            
+            if ScriptRestartCount < MaxRestartAttempts then
+                LogInfo("Auto-restarting script... (Attempt "..ScriptRestartCount.."/"..MaxRestartAttempts..")", true)
+                LogError("Error details: "..LastErrorMessage)
+                
+                -- Emergency cleanup
+                pcall(function()
+                    yield("/vnav stop")
+                    if HasTarget() then
+                        yield("/clearlog")
+                    end
+                end)
+                
+                yield("/wait 3")
+                LogInfo("Restarting Chocobo Racing script...")
+                yield("/snd run \"ChocoboRace\"")
+            else
+                LogError("Maximum restart attempts reached. Script stopped.", true)
+            end
+        end
+    end
+    
+    RunWithErrorHandling()
+else
+    -- Run without auto-restart
+    MainChocoboScript()
+end
 
 --#endregion Script Entry Point

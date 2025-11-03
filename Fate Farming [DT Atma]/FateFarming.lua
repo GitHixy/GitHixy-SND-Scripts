@@ -1,7 +1,7 @@
 --[=====[
 [[SND Metadata]]
 author: GitHixy (based on pot0to's 3.0.9)
-version: 3.2.1
+version: 3.2.3
 description: >-
   Fate farming script with the following features:
 
@@ -188,12 +188,21 @@ configs:
 *                                  Changelog                                   *
 ********************************************************************************
 
+    -> 3.2.3    By GitHixy.
+                Fixed auto-restart functionality to properly use "/snd run" command for script restarts.
+                Improved error handling wrapper to handle SND script termination on Lua errors.
+                Enhanced restart mechanism with proper cleanup before restarting the script.
+    -> 3.2.2    By GitHixy.
+                Fixed all remaining nil comparison errors throughout the script.
+                Added comprehensive nil-safe checks for all Progress comparisons in fate selection logic.
+                Fixed boss fate progress checks, collections fate completion checks, and fate status validations.
+                Enhanced error handling for distance calculations and fate object validations.
     -> 3.2.1    By GitHixy.
                 Added automatic script restart on Lua errors to prevent interruptions during farming.
                 New metadata option: "Auto Restart on Error?" - automatically restarts the script when a random Lua error occurs.
                 Maximum 10 restart attempts with 3-second cooldown between restarts to prevent infinite loops.
                 Added comprehensive error logging and user notifications for restart events.
-                Fixed nil comparison errors in Progress checks (nearestFate.Progress and CurrentFate.fateObject.Progress).
+                Fixed initial nil comparison errors in Progress checks (nearestFate.Progress and CurrentFate.fateObject.Progress).
     -> 3.2.0    By GitHixy.
                 Added Multi Zone Farming mode: automatically cycles through zones when no eligible FATEs found.
                 New metadata options: "Enable Multi Zone Farming?" and "Multi Zone List".
@@ -1672,13 +1681,13 @@ function SelectNextFateHelper(tempFate, nextFate)
         -- if both are bonus fates, go through the regular fate selection process
     end
 
-    if tempFate.timeLeft < MinTimeLeftToIgnoreFate or tempFate.fateObject.Progress > CompletionToIgnoreFate then
+    if tempFate.timeLeft < MinTimeLeftToIgnoreFate or (tempFate.fateObject.Progress ~= nil and tempFate.fateObject.Progress > CompletionToIgnoreFate) then
         Dalamud.Log("[FATE] Ignoring fate #"..tempFate.fateId.." due to insufficient time or high completion.")
         return nextFate
     elseif nextFate == nil then
         Dalamud.Log("[FATE] Selecting #"..tempFate.fateId.." because no other options so far.")
         return tempFate
-    elseif nextFate.timeLeft < MinTimeLeftToIgnoreFate or nextFate.fateObject.Progress > CompletionToIgnoreFate then
+    elseif nextFate.timeLeft < MinTimeLeftToIgnoreFate or (nextFate.fateObject.Progress ~= nil and nextFate.fateObject.Progress > CompletionToIgnoreFate) then
         Dalamud.Log("[FATE] Ignoring fate #"..nextFate.fateId.." due to insufficient time or high completion.")
         return tempFate
     end
@@ -1686,9 +1695,11 @@ function SelectNextFateHelper(tempFate, nextFate)
     -- Evaluate based on priority (Loop through list return first non-equal priority)
     for _, criteria in ipairs(FatePriority) do
         if criteria == "Progress" then
-            Dalamud.Log("[FATE] Comparing progress: "..tempFate.fateObject.Progress.." vs "..nextFate.fateObject.Progress)
-            if tempFate.fateObject.Progress > nextFate.fateObject.Progress then return tempFate end
-            if tempFate.fateObject.Progress < nextFate.fateObject.Progress then return nextFate end
+            local tempProgress = tempFate.fateObject.Progress or 0
+            local nextProgress = nextFate.fateObject.Progress or 0
+            Dalamud.Log("[FATE] Comparing progress: "..tempProgress.." vs "..nextProgress)
+            if tempProgress > nextProgress then return tempFate end
+            if tempProgress < nextProgress then return nextFate end
         elseif criteria == "Bonus" then
             Dalamud.Log("[FATE] Checking bonus status: "..tostring(tempFate.isBonusFate).." vs "..tostring(nextFate.isBonusFate))
             if tempFate.isBonusFate and not nextFate.isBonusFate then return tempFate end
@@ -1735,8 +1746,9 @@ function SelectNextFate()
             if not tempFate.isBlacklistedFate then -- check fate is not blacklisted for any reason
                 if tempFate.isBossFate then
                     Dalamud.Log("[FATE] Is a boss fate")
-                    if (tempFate.isSpecialFate and tempFate.fateObject.Progress >= CompletionToJoinSpecialBossFates) or
-                        (not tempFate.isSpecialFate and tempFate.fateObject.Progress >= CompletionToJoinBossFate) then
+                    local currentProgress = tempFate.fateObject.Progress or 0
+                    if (tempFate.isSpecialFate and currentProgress >= CompletionToJoinSpecialBossFates) or
+                        (not tempFate.isSpecialFate and currentProgress >= CompletionToJoinBossFate) then
                         nextFate = SelectNextFateHelper(tempFate, nextFate)
                     else
                         Dalamud.Log("[FATE] Skipping fate #"..tempFate.fateId.." "..tempFate.fateName.." due to boss fate with not enough progress.")
@@ -2929,11 +2941,11 @@ end
 function SetMaxDistance()
     --ranged and casters have a further max distance so not always running all way up to target
     if not Player.Job.IsMeleeDPS or not Player.Job.IsTank then
-        MaxDistance = RangedDist
-        Dalamud.Log("[FATE] Setting max distance to "..RangedDist)
+        MaxDistance = RangedDist or 20  -- fallback to 20 if nil
+        Dalamud.Log("[FATE] Setting max distance to "..(RangedDist or "20 (fallback)"))
     else
-        MaxDistance = MeleeDist --default to melee distance
-        Dalamud.Log("[FATE] Setting max distance to "..MeleeDist)
+        MaxDistance = MeleeDist or 2.5 --default to melee distance or fallback to 2.5
+        Dalamud.Log("[FATE] Setting max distance to "..(MeleeDist or "2.5 (fallback)"))
     end
 end
 
@@ -3107,7 +3119,7 @@ function DoFate()
         Dalamud.Log("[FATE] pushed out of fate going back!")
         IPC.vnavmesh.PathfindAndMoveTo(CurrentFate.position, Svc.Condition[CharacterCondition.flying] and SelectedZone.flying)
         return
-    elseif not IsFateActive(CurrentFate.fateObject) or CurrentFate.fateObject.Progress == 100 then
+    elseif not IsFateActive(CurrentFate.fateObject) or (CurrentFate.fateObject.Progress ~= nil and CurrentFate.fateObject.Progress == 100) then
         yield("/vnav stop")
         ClearTarget()
         if not Dalamud.Log("[FATE] HasContintuation check") and CurrentFate.hasContinuation then
@@ -3131,7 +3143,7 @@ function DoFate()
         return
     elseif CurrentFate.isCollectionsFate then
         yield("/wait 1") -- needs a moment after start of fate for GetFateEventItem to populate
-        if Inventory.GetItemCount(CurrentFate.fateObject.EventItem) >= 7 or (GotCollectionsFullCredit and CurrentFate.fateObject.Progress == 100) then
+        if Inventory.GetItemCount(CurrentFate.fateObject.EventItem) >= 7 or (GotCollectionsFullCredit and CurrentFate.fateObject.Progress ~= nil and CurrentFate.fateObject.Progress == 100) then
             yield("/vnav stop")
             State = CharacterState.collectionsFateTurnIn
             Dalamud.Log("[FATE] State Change: CollectionsFatesTurnIn")
@@ -4003,7 +4015,16 @@ JoinCollectionsFates = Config.Get("Do collection FATEs?")
 BonusFatesOnly = Config.Get("Do only bonus FATEs?")         --If true, will only do bonus fates and ignore everything else
 
 MeleeDist = Config.Get("Max melee distance")
+if MeleeDist == nil then
+    MeleeDist = 2.5  -- Default fallback
+    Dalamud.Log("[CONFIG] MeleeDist was nil, using default: 2.5")
+end
+
 RangedDist = Config.Get("Max ranged distance")
+if RangedDist == nil then
+    RangedDist = 20  -- Default fallback
+    Dalamud.Log("[CONFIG] RangedDist was nil, using default: 20")
+end
 
 RotationPlugin = Config.Get("Rotation Plugin")
 if RotationPlugin == "Any" then
@@ -4254,7 +4275,7 @@ function MainScriptLoop()
         Dalamud.Log("[FATE] State Change: Dead")
     elseif State ~= CharacterState.unexpectedCombat and State ~= CharacterState.doFate and
         State ~= CharacterState.waitForContinuation and State ~= CharacterState.collectionsFateTurnIn and
-        (not InActiveFate() or (InActiveFate() and IsCollectionsFate(nearestFate.Name) and nearestFate.Progress == 100)) and
+        (not InActiveFate() or (InActiveFate() and IsCollectionsFate(nearestFate.Name) and nearestFate.Progress ~= nil and nearestFate.Progress == 100)) and
         Svc.Condition[CharacterCondition.inCombat]
     then
         State = CharacterState.unexpectedCombat
@@ -4303,57 +4324,65 @@ end -- End of MainScriptLoop function
 
 --#endregion
 
--- Main execution with error handling
-repeat
-    local success, errorMessage = pcall(MainScriptLoop)
+-- Simple restart handler using a separate script
+if AutoRestartOnError then
+    -- Create a simple restart monitor script
+    local restartScript = [[
+-- Auto-restart monitor for Fate Farming
+local maxAttempts = ]]..MaxRestartAttempts..[[
+local attempts = 0
+local scriptName = "Fate Farming"
+local checkInterval = 5 -- seconds
+
+while attempts < maxAttempts do
+    yield("/wait "..checkInterval)
     
-    if not success then
+    -- Check if main script is running
+    local isRunning = false
+    -- Note: We can't directly check if script is running in SND
+    -- This monitor will be manually triggered by the main script on error
+    
+    yield("/wait 1")
+end
+]]
+
+    -- Save restart monitor (this is conceptual - SND doesn't support creating files)
+    -- Instead, we'll handle restarts differently
+end
+
+-- Main execution with basic error wrapping
+local function RunWithErrorHandling()
+    local success, errorMsg = pcall(MainScriptLoop)
+    
+    if not success and AutoRestartOnError then
         ScriptRestartCount = ScriptRestartCount + 1
-        LastErrorMessage = tostring(errorMessage)
+        LastErrorMessage = tostring(errorMsg)
         
-        Dalamud.Log("[ERROR] Script crashed with error: "..LastErrorMessage)
-        Dalamud.Log("[ERROR] Restart attempt "..ScriptRestartCount.."/"..MaxRestartAttempts)
+        Dalamud.Log("[ERROR] Script error: "..LastErrorMessage)
         
-        if AutoRestartOnError and ScriptRestartCount < MaxRestartAttempts then
-            yield("/echo [FATE] ⚠️ Lua error detected. Auto-restarting... (Attempt "..ScriptRestartCount.."/"..MaxRestartAttempts..")")
-            yield("/echo [FATE] Error: "..LastErrorMessage)
+        if ScriptRestartCount < MaxRestartAttempts then
+            yield("/echo [FATE] ERROR: Script crashed. Attempting restart ("..ScriptRestartCount.."/"..MaxRestartAttempts..")...")
+            yield("/echo [FATE] Error details: "..LastErrorMessage)
             
-            -- Stop any running navigation
-            yield("/vnav stop")
+            -- Cleanup before restart
+            pcall(function()
+                yield("/vnav stop")
+                if Svc.Targets and Svc.Targets.Target ~= nil then
+                    ClearTarget()
+                end
+            end)
             
-            -- Clear target
-            if Svc.Targets.Target ~= nil then
-                ClearTarget()
-            end
-            
-            -- Turn off combat mods before restarting
-            if CombatModsOn then
-                TurnOffCombatMods()
-            end
-            
-            -- Wait a bit before restarting to avoid rapid loops
             yield("/wait 3")
-            
-            Dalamud.Log("[RESTART] Restarting script after error...")
-            yield("/echo [FATE] 🔄 Script restarting...")
-            
-            -- Reset some state variables
-            State = CharacterState.ready
-            CurrentFate = nil
-            StopScript = false
-            
+            yield("/echo [FATE] Restarting script...")
+            yield("/snd run \"Fate Farming\"")
         else
-            if ScriptRestartCount >= MaxRestartAttempts then
-                yield("/echo [FATE] ❌ Maximum restart attempts reached ("..MaxRestartAttempts.."). Script stopped.")
-                Dalamud.Log("[ERROR] Maximum restart attempts reached. Script stopped.")
-            elseif not AutoRestartOnError then
-                yield("/echo [FATE] ❌ Auto-restart disabled. Script stopped.")
-                Dalamud.Log("[ERROR] Auto-restart disabled. Script stopped.")
-            end
-            StopScript = true
+            yield("/echo [FATE] ERROR: Maximum restart attempts reached. Script stopped.")
+            Dalamud.Log("[ERROR] Maximum restart attempts reached.")
         end
     end
-until StopScript or not AutoRestartOnError
+end
+
+RunWithErrorHandling()
 
 -- Final cleanup
 yield("/vnav stop")
