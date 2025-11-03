@@ -77,7 +77,7 @@ configs:
     -> 2.1.3    By GitHixy.
                 Emergency simplified version to bypass addon interaction issues.
                 Temporarily removed complex Chocobo info retrieval to prevent script failures.
-                Simplified ContentsFinder interactions using basic /dfinder and /pcall commands.
+                Removed all /pcall commands that don't exist in SND v2, using basic /dfinder and /click commands.
                 Changed approach to focus on core racing functionality while debugging addon access.
                 This version prioritizes script execution over data accuracy for testing purposes.
     -> 2.1.2    By GitHixy.
@@ -319,11 +319,12 @@ end
 
 --#region Main Functions
 
--- Function to open Duty Roulette
+-- Function to open Duty Roulette (simplified for testing)
 function OpenRouletteDuty(dutyID)
     yield("/dutyfinder")
     yield("/wait 1")
-    yield("/pcall ContentsFinder true 1 " .. dutyID)
+    -- Removed /pcall command that doesn't exist in SND
+    LogDebug("OpenRouletteDuty called with dutyID: " .. tostring(dutyID))
     yield("/wait 0.5")
 end
 
@@ -784,7 +785,8 @@ function start_chocobo_race()
     yield("/wait 9")
     yield("/e Exiting from Chocobo Race!")
     yield("/release " .. move_forward_key)
-    yield("/pcall RaceChocoboResult true 1 0 <wait.1>")
+    -- Removed /pcall command - using basic click instead
+    yield("/click RaceChocoboResult Exit")
     yield("/wait 4")
 
     -- Check the Chocobo's rank after the race
