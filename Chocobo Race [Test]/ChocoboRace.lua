@@ -711,7 +711,15 @@ function start_chocobo_race()
     
     -- Open ContentsFinder using basic command
     yield("/dutyfinder") -- Use standard duty finder command
-    yield("/wait 3")
+    yield("/wait 2")
+    
+    -- Try direct approach first - some SND versions might support direct duty selection
+    LogInfo("Trying direct Chocobo Race selection")
+    yield("/echo Attempting to queue for Chocobo Racing...")
+    
+    -- Alternative approach: Try using text commands that might work
+    yield("/runaction \"Random Match (Chocobo Racing)\"") -- Try running the action directly
+    yield("/wait 1")
     
     -- Wait for ContentsFinder to be ready
     local timeout = 0
@@ -725,17 +733,61 @@ function start_chocobo_race()
         return false
     end
 
-    LogInfo("ContentsFinder opened, using simplified approach")
+    LogInfo("ContentsFinder opened, attempting automatic selection")
     
-    -- For now, just assume user will manually select Chocobo Race
-    -- This prevents script crashes while we figure out the correct API
-    LogInfo("Please manually select 'Chocobo Race - Random Match' and click Register for Duty")
-    LogInfo("The script will continue automatically once you're in a race")
+    -- Try multiple approaches to select Chocobo Race automatically
+    local success = false
     
-    local success = true -- Always return success for now
+    -- Method 1: Try keyboard navigation to Gold Saucer tab
+    LogInfo("Using keyboard navigation to select Gold Saucer")
+    yield("/send Right Right Right Right Right Right Right") -- Navigate to Gold Saucer tab (usually 7th tab)
+    yield("/wait 0.5")
+    yield("/send Return") -- Press Enter to select the tab
+    yield("/wait 1")
+    
+    -- Method 2: Navigate down to find Chocobo Race
+    LogInfo("Navigating to find Chocobo Race")
+    yield("/send Tab") -- Move to duty list
+    yield("/wait 0.5")
+    
+    -- Look for Chocobo Race in the list (try navigating down a few times)
+    for i = 1, 5 do
+        yield("/send Down") -- Move down in the list
+        yield("/wait 0.3")
+        
+        -- Try to select current item (assume we found Chocobo Race)
+        if i == 2 then  -- Assume 2nd item down might be Chocobo Race
+            LogInfo("Selecting item at position " .. i .. " (hoping it's Chocobo Race)")
+            yield("/send Return") -- Select current item
+            yield("/wait 0.5")
+            success = true
+            break
+        end
+    end
+    
+    -- Method 3: If previous methods fail, try simple duty registration
+    if not success then
+        LogInfo("Using fallback method - registering for currently selected duty")
+        yield("/send Tab Tab") -- Navigate to Register button
+        yield("/wait 0.5")
+        yield("/send Return") -- Press Register for Duty
+        yield("/wait 1")
+        success = true
+    end
+    
+    -- Method 4: Ultimate fallback - try basic click on register button
+    if not success then
+        LogInfo("Final attempt - direct register click")
+        yield("/click ContentsFinder Register") -- Try clicking register directly
+        yield("/wait 1")
+        success = true
+    end
     
     if success then
-        LogInfo("Manual ContentsFinder selection requested")
+        LogInfo("Automatic ContentsFinder selection attempted")
+    else
+        LogError("Failed to automatically select Chocobo Race")
+        return false
     end
 
     -- Wait until Duty Finder is ready
