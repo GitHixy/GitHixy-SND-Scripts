@@ -1,7 +1,7 @@
 --[=====[
 [[SND Metadata]]
 author: GitHixy
-version: 2.1.0
+version: 2.1.1
 description: >-
   Automated Chocobo Training & Racing script with comprehensive features:
 
@@ -76,6 +76,12 @@ configs:
 *                                  Changelog                                   *
 ********************************************************************************
 
+    -> 2.1.1    By GitHixy.
+                Fixed critical nil-safety issues in SND v2 helper functions.
+                Enhanced GetNodeText, GetNodeListCount, IsAddonReady, and IsAddonVisible with proper nil checks.
+                Improved Chocobo information parsing with better debug logging.
+                Fixed auto-restart error handling logic to properly handle nil pointer exceptions.
+                Added comprehensive pcall protection for addon node access.
     -> 2.1.0    By GitHixy.
                 Added comprehensive error handling and auto-restart functionality.
                 New metadata options: "Auto Restart on Error?", "Enable Debug Logging?", "Echo Messages".
@@ -225,19 +231,33 @@ end
 
 function GetNodeText(addonName, ...)
     if IsAddonReady(addonName) then
-        local node = Addons.GetAddon(addonName):GetNode(...)
-        return tostring(node.Text)
+        local addon = Addons.GetAddon(addonName)
+        if addon then
+            local success, node = pcall(addon.GetNode, addon, ...)
+            if success and node and node.Text then
+                return tostring(node.Text)
+            else
+                LogDebug("Failed to get node text from '"..addonName.."' or node has no Text property")
+                return ""
+            end
+        else
+            LogDebug("Failed to get addon '"..addonName.."'")
+            return ""
+        end
     else
+        LogDebug("Addon '"..addonName.."' is not ready for GetNodeText")
         return ""
     end
 end
 
 function IsAddonReady(name)
-    return Addons.GetAddon(name).Ready
+    local addon = Addons.GetAddon(name)
+    return addon ~= nil and addon.Ready == true
 end
 
 function IsAddonVisible(name)
-    return Addons.GetAddon(name).Exists
+    local addon = Addons.GetAddon(name)
+    return addon ~= nil and addon.Exists == true
 end
 
 function GetZoneID()
@@ -260,8 +280,15 @@ end
 
 function GetNodeListCount(addonName)
     if IsAddonReady(addonName) then
-        return Addons.GetAddon(addonName).NodeList:Count()
+        local addon = Addons.GetAddon(addonName)
+        if addon and addon.NodeList then
+            return addon.NodeList:Count()
+        else
+            LogDebug("Addon '"..addonName.."' has no NodeList")
+            return 0
+        end
     else
+        LogDebug("Addon '"..addonName.."' is not ready")
         return 0
     end
 end
@@ -340,13 +367,20 @@ function get_chocobo_info()
     
     yield("/wait 1")
     
-    local rank = tonumber(GetNodeText("GoldSaucerInfo", 16)) or 0
-    local name = GetNodeText("GoldSaucerInfo", 20) or "Unknown"
+    local rankText = GetNodeText("GoldSaucerInfo", 16)
+    local rank = tonumber(rankText) or 0
+    LogDebug("Raw rank text: '"..rankText.."' -> parsed rank: "..rank)
+    
+    local nameText = GetNodeText("GoldSaucerInfo", 20)
+    local name = (nameText ~= "" and nameText) or "Unknown"
+    LogDebug("Raw name text: '"..nameText.."' -> parsed name: '"..name.."'")
+    
     local trainingSessionsAvailable = 0
 
     if IsAddonReady("GSInfoChocoboParam") then
-        trainingSessionsAvailable = tonumber(GetNodeText("GSInfoChocoboParam", 9, 0)) or 0
-        LogDebug("Found GSInfoChocoboParam addon, training sessions: "..trainingSessionsAvailable)
+        local sessionsText = GetNodeText("GSInfoChocoboParam", 9, 0)
+        trainingSessionsAvailable = tonumber(sessionsText) or 0
+        LogDebug("Found GSInfoChocoboParam addon, raw sessions text: '"..sessionsText.."' -> sessions: "..trainingSessionsAvailable)
     else
         LogError("GSInfoChocoboParam not ready. Defaulting training sessions to 0.")
     end
@@ -877,9 +911,7 @@ function MainChocoboScript()
         
         if not success then
             LogError("Main script function failed: "..tostring(error))
-            if auto_restart_on_error then
-                LogError("Auto-restart is enabled, but this error requires manual intervention")
-            end
+            -- Let the outer error handler deal with restarts
             StopScript = true
             break
         end
