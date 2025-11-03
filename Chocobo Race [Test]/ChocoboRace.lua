@@ -3,23 +3,21 @@
 author: GitHixy
 version: 2.1.3
 description: >-
-  Automated Chocobo Training & Racing script with comprehensive features:
+  TESTING VERSION: Simplified Chocobo Racing script for debugging SND v2 API issues.
 
-  - Automatic training when sessions are available before racing
+  This version bypasses complex addon interactions to focus on core functionality:
 
-  - Smart food purchasing system for all feed types (Grade 1)
+  - Opens Duty Finder and asks user to manually select Chocobo Race
 
-  - Continuous training and racing until target rank is achieved
+  - Provides race controls once in a Chocobo race
 
-  - Multi-feed support: Speed, Acceleration, Endurance, Stamina, Balance
+  - Uses simplified approaches to prevent script crashes
 
-  - Enhanced race logic with Chocobo Dash ability integration
+  - Includes comprehensive logging for troubleshooting
 
-  - Robust error handling and auto-restart functionality
+  - Auto-restart functionality for error recovery
 
-  - Improved NPC targeting and interaction reliability
-
-  Note: Optimized for convenience and consistency rather than competitive racing performance.
+  NOTE: This is a testing version while we debug proper SND v2 API usage.
 
 plugin_dependencies:
 - Lifestream
@@ -707,12 +705,12 @@ function start_chocobo_race()
         return
     end
 
-    -- Simplified approach for ContentsFinder
+    -- Use basic SND approach for ContentsFinder
     LogInfo("Opening Duty Finder for Chocobo Racing")
     
-    -- Open ContentsFinder
-    yield("/dfinder")
-    yield("/wait 2")
+    -- Open ContentsFinder using basic command
+    yield("/dutyfinder") -- Use standard duty finder command
+    yield("/wait 3")
     
     -- Wait for ContentsFinder to be ready
     local timeout = 0
@@ -726,30 +724,18 @@ function start_chocobo_race()
         return false
     end
 
-    LogInfo("ContentsFinder opened, attempting to select Chocobo Race")
+    LogInfo("ContentsFinder opened, using simplified approach")
     
-    -- Try multiple approaches to find and select Chocobo Race
-    local success = false
+    -- For now, just assume user will manually select Chocobo Race
+    -- This prevents script crashes while we figure out the correct API
+    LogInfo("Please manually select 'Chocobo Race - Random Match' and click Register for Duty")
+    LogInfo("The script will continue automatically once you're in a race")
     
-    -- Method 1: Try Gold Saucer tab directly
-    yield("/pcall ContentsFinder true 12 7") -- Tab 7 for Gold Saucer
-    yield("/wait 1")
-    
-    -- Method 2: Try direct ID selection
-    yield("/pcall ContentsFinder true 0 0 21") -- ChocoboRaceID = 21
-    yield("/wait 1")
-    success = true -- Assume it works since we can't verify easily
+    local success = true -- Always return success for now
     
     if success then
-        LogInfo("Chocobo Race selection attempted")
-    else
-        LogError("Failed to select Chocobo Race")
-        return false
+        LogInfo("Manual ContentsFinder selection requested")
     end
-
-    -- Start Duty Finder
-    LogInfo("Starting Duty Finder")
-    yield("/pcall ContentsFinder true 12 0")
 
     -- Wait until Duty Finder is ready
     while not IsAddonReady("ContentsFinderConfirm") do
