@@ -739,27 +739,39 @@ function start_chocobo_race()
         yield("/wait 0.5")
     end
 
-    -- Clear previous selection
-    yield("/pcall ContentsFinder true 12 1")
-
-    -- Search for "Chocobo Race: Random"
-    FoundTheDuty = false
-    for i = 1, list do  -- Iterate over List duties
-        yield("/pcall ContentsFinder true 3 " .. i)
-        yield("/wait 0.1")
+    -- Direct selection of Random Chocobo Race
+    LogInfo("Selecting Random Chocobo Race directly")
+    yield("/pcall ContentsFinder true 26 12 18")
+    yield("/wait 0.5")
+    
+    -- Verify the selection worked by checking if we can see the duty name
+    local selectedDuty = GetNodeText("ContentsFinder", 14)
+    LogDebug("Selected duty: '"..selectedDuty.."'")
+    
+    if selectedDuty == "" or not selectedDuty:find("Chocobo") then
+        LogError("Failed to select Random Chocobo Race. Selected duty: '"..selectedDuty.."'")
+        LogInfo("Falling back to search method...")
         
-        if GetNodeText("ContentsFinder", 14) == "Chocobo Race: Random" then
-            FoundTheDuty = true
-            yield("/echo Random Chocobo Race selected at position " .. i)
-            break
+        -- Fallback to original search method
+        yield("/pcall ContentsFinder true 12 1")
+        local FoundTheDuty = false
+        for i = 1, list do
+            yield("/pcall ContentsFinder true 3 " .. i)
+            yield("/wait 0.1")
+            
+            if GetNodeText("ContentsFinder", 14) == "Chocobo Race: Random" then
+                FoundTheDuty = true
+                LogInfo("Found Random Chocobo Race at position " .. i)
+                break
+            end
         end
-    end
-
-    -- Check if Random Chocobo Race was found
-    if FoundTheDuty == false then
-        yield("/echo You don't have the Duty")
-        yield("/snd stop")
-        return
+        
+        if not FoundTheDuty then
+            LogError("Could not find Random Chocobo Race in duty list")
+            return false
+        end
+    else
+        LogInfo("Successfully selected Random Chocobo Race: '"..selectedDuty.."'")
     end
 
     -- Start Duty Finder
