@@ -9,6 +9,7 @@ description: >-
   - Access Gold Saucer menu
   - Navigate to Chocobo racing section
   - Retrieve Chocobo name and current rank
+
 plugin_dependencies:
 - TextAdvance
 configs:
@@ -18,12 +19,10 @@ configs:
     type: int
     min: 1
     max: 40
-    required: true
   Key to go forward:
     default: "W"
     description: Movement key for racing
     type: string
-    required: true
 --]=====]
 
 -- Load dependencies
