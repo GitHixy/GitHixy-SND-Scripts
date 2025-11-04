@@ -25,10 +25,6 @@ configs:
     type: string
 --]=====]
 
--- Load dependencies
-local vac_script_directory = GetScriptDirectory()
-dofile(vac_script_directory .. "vac_functions.lua")
-
 -- Plugin checks
 if not HasPlugin("TextAdvance") then
     LogInfo("[CHOCOBO] TextAdvance plugin required")
