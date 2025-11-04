@@ -4,3 +4,6 @@ vac_lists.lua
 
 # Dalamud API documentation (keep updated but don't commit)
 DALAMUD_API_REFERENCE.md
+
+# GitHub-specific files
+.github
