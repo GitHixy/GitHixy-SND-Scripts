@@ -81,8 +81,8 @@ end
 function NavigateToChocobo()
     yield("/echo [CHOCOBO] Navigating to Chocobo section...")
 
-    -- Click Chocobo tab using callback command
-    yield("/callback 0 1 122")
+    -- Click Chocobo tab using click command
+    yield("/click GoldSaucerInfo 26 4")
     yield("/wait 2")
 
     -- Assume Chocobo section accessed successfully
