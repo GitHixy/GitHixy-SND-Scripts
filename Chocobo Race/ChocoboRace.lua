@@ -81,8 +81,8 @@ end
 function NavigateToChocobo()
     yield("/echo [CHOCOBO] Navigating to Chocobo section...")
 
-    -- Click Chocobo tab in GoldSaucerInfo addon (position 26 4)
-    yield("/click GoldSaucerInfo 26 4")
+    -- Click Chocobo tab using callback command
+    yield("/callback 0 1 122")
     yield("/wait 2")
 
     -- Assume Chocobo section accessed successfully
