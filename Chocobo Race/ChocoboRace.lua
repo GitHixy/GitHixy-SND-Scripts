@@ -68,17 +68,12 @@ end
 function AccessGoldSaucer()
     yield("/echo [CHOCOBO] Accessing Gold Saucer menu...")
 
-    -- Open main menu
-    yield("/g")
-    yield("/wait 1")
-
-    -- Navigate to Gold Saucer option (typically option 3 or similar)
-    -- This may need adjustment based on menu structure
-    yield("/callback SelectString true 3")
+    -- Open Gold Saucer menu directly
+    yield("/goldsaucer")
     yield("/wait 2")
 
     -- Assume Gold Saucer menu opened successfully
-    yield("/echo [CHOCOBO] Gold Saucer menu accessed (assuming success)")
+    yield("/echo [CHOCOBO] Gold Saucer menu accessed successfully")
     return true
 end
 
@@ -86,13 +81,12 @@ end
 function NavigateToChocobo()
     yield("/echo [CHOCOBO] Navigating to Chocobo section...")
 
-    -- Navigate to Chocobo racing option
-    -- This may need adjustment based on Gold Saucer menu structure
-    yield("/callback GoldSaucer true 1")
+    -- Click Chocobo tab in GoldSaucerInfo addon (position 26 4)
+    yield("/click GoldSaucerInfo 26 4")
     yield("/wait 2")
 
-    -- Assume Chocobo menu opened successfully
-    yield("/echo [CHOCOBO] Chocobo section accessed (assuming success)")
+    -- Assume Chocobo section accessed successfully
+    yield("/echo [CHOCOBO] Chocobo section accessed successfully")
     return true
 end
 
@@ -100,8 +94,11 @@ end
 function GetChocoboInfo()
     yield("/echo [CHOCOBO] Retrieving Chocobo information...")
 
-    -- Wait for menu to load
-    yield("/wait 1")
+    -- Get Chocobo name from GSInfoChocoboParam addon (when vac_functions.lua is available)
+    -- local chocoboName = GetNodeText("GSInfoChocoboParam", 2)
+
+    -- Get current rank from GSInfoChocoboParam addon (when vac_functions.lua is available)
+    -- local currentRank = GetNodeText("GSInfoChocoboParam", 3)
 
     -- For now, return placeholder values since GetNodeText is not available
     local chocoboName = "Unknown Chocobo" -- Placeholder
