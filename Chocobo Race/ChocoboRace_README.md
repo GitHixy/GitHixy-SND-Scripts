@@ -25,10 +25,14 @@ This is an automated Chocobo Racing script for Final Fantasy XIV. The script han
 - **Something Need Doing [Expanded Edition]**: Main plugin
 - **TextAdvance**: For interacting with menus
 
+### Required Scripts
+- **vac_functions.lua**: Must be loaded separately in SND before running this script
+
 ### Instructions
-1. Import the script into SND (Something Need Doing)
-2. Configure the target rank and movement key if desired
-3. Start the script - it will automatically access the Gold Saucer and retrieve Chocobo information
+1. Load `vac_functions.lua` as a separate script in SND first
+2. Import the Chocobo Race script into SND
+3. Configure the target rank and movement key if desired
+4. Start the script - it will automatically access the Gold Saucer and retrieve Chocobo information
 
 ## Development Status
 

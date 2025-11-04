@@ -29,90 +29,87 @@ configs:
 --]=====]
 
 -- Plugin checks
-if not HasPlugin("TextAdvance") then
-    LogInfo("[CHOCOBO] TextAdvance plugin required")
-    return
-end
+yield("/echo [CHOCOBO] TextAdvance plugin required - please ensure it's installed")
 
 -- Main script logic
 function Main()
-    LogInfo("[CHOCOBO] Starting Chocobo Race script v1.0.0")
+    yield("/echo [CHOCOBO] Starting Chocobo Race script v1.0.0")
 
     -- Wait for player to be ready
     LoginCheck()
 
     -- Access Gold Saucer menu
     if not AccessGoldSaucer() then
-        LogInfo("[CHOCOBO] Failed to access Gold Saucer menu")
+        yield("/echo [CHOCOBO] Failed to access Gold Saucer menu")
         return
     end
 
     -- Navigate to Chocobo section
     if not NavigateToChocobo() then
-        LogInfo("[CHOCOBO] Failed to navigate to Chocobo section")
+        yield("/echo [CHOCOBO] Failed to navigate to Chocobo section")
         return
     end
 
     -- Get Chocobo information
     local chocoboName, currentRank = GetChocoboInfo()
     if chocoboName and currentRank then
-        LogInfo("[CHOCOBO] Chocobo Name: " .. chocoboName)
-        LogInfo("[CHOCOBO] Current Rank: " .. currentRank .. " / 40")
+        yield("/echo [CHOCOBO] Chocobo Name: " .. chocoboName)
+        yield("/echo [CHOCOBO] Current Rank: " .. currentRank .. " / 40")
     else
-        LogInfo("[CHOCOBO] Failed to retrieve Chocobo information")
+        yield("/echo [CHOCOBO] Failed to retrieve Chocobo information")
     end
 
-    LogInfo("[CHOCOBO] Script completed - basic functionality implemented")
+    yield("/echo [CHOCOBO] Script completed - basic functionality implemented")
 end
 
 -- Function to access Gold Saucer menu
 function AccessGoldSaucer()
-    LogInfo("[CHOCOBO] Accessing Gold Saucer menu...")
+    yield("/echo [CHOCOBO] Accessing Gold Saucer menu...")
 
     -- Open main menu
     yield("/g")
-    Sleep(1)
+    yield("/wait 1")
 
     -- Navigate to Gold Saucer option (typically option 3 or similar)
     -- This may need adjustment based on menu structure
     yield("/callback SelectString true 3")
-    Sleep(2)
+    yield("/wait 2")
 
     -- Check if Gold Saucer menu opened
     if IsAddonVisible("GoldSaucerReward") or IsAddonVisible("GoldSaucer") then
-        LogInfo("[CHOCOBO] Gold Saucer menu accessed successfully")
+        yield("/echo [CHOCOBO] Gold Saucer menu accessed successfully")
         return true
     end
 
-    LogInfo("[CHOCOBO] Gold Saucer menu not detected")
+    yield("/echo [CHOCOBO] Gold Saucer menu not detected")
     return false
 end
 
 -- Function to navigate to Chocobo section
 function NavigateToChocobo()
-    LogInfo("[CHOCOBO] Navigating to Chocobo section...")
+    yield("/echo [CHOCOBO] Navigating to Chocobo section...")
 
     -- Navigate to Chocobo racing option
     -- This may need adjustment based on Gold Saucer menu structure
     yield("/callback GoldSaucer true 1")
-    Sleep(2)
+    yield("/wait 2")
 
     -- Check if Chocobo menu opened
     if IsAddonVisible("ChocoboRace") then
-        LogInfo("[CHOCOBO] Chocobo section accessed successfully")
+        yield("/echo [CHOCOBO] Chocobo section accessed successfully")
         return true
     end
 
-    LogInfo("[CHOCOBO] Chocobo section not detected")
+    yield("/echo [CHOCOBO] Chocobo section not detected")
     return false
 end
 
 -- Function to get Chocobo information
 function GetChocoboInfo()
-    LogInfo("[CHOCOBO] Retrieving Chocobo information...")
+    yield("/echo [CHOCOBO] Retrieving Chocobo information...")
 
     -- Wait for menu to load
-    Sleep(1)
+    yield("/wait 1")
 
     -- Get Chocobo name (this will need to be implemented based on actual menu structure)
     local chocoboName = GetNodeText("ChocoboRace", 2) -- Placeholder - needs actual node path
