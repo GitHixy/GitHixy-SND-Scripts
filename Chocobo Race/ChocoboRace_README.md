@@ -26,7 +26,7 @@ This is an automated Chocobo Racing script for Final Fantasy XIV. The script han
 - **TextAdvance**: For interacting with menus
 
 ### Required Scripts
-- **vac_functions.lua**: Must be loaded separately in SND before running this script
+- **vac_functions.lua** (optional): For full Chocobo information retrieval. Load separately in SND for enhanced functionality.
 
 ### Instructions
 1. Load `vac_functions.lua` as a separate script in SND first

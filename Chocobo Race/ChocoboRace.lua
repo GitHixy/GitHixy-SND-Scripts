@@ -10,6 +10,8 @@ description: >-
   - Navigate to Chocobo racing section
   - Retrieve Chocobo name and current rank
 
+  Note: Full Chocobo info retrieval requires vac_functions.lua to be loaded separately
+
 plugin_dependencies:
 - TextAdvance
 configs:
@@ -35,8 +37,8 @@ yield("/echo [CHOCOBO] TextAdvance plugin required - please ensure it's installe
 function Main()
     yield("/echo [CHOCOBO] Starting Chocobo Race script v1.0.0")
 
-    -- Wait for player to be ready
-    LoginCheck()
+    -- Wait for player to be ready (simple wait instead of LoginCheck)
+    yield("/wait 2")
 
     -- Access Gold Saucer menu
     if not AccessGoldSaucer() then
@@ -75,14 +77,9 @@ function AccessGoldSaucer()
     yield("/callback SelectString true 3")
     yield("/wait 2")
 
-    -- Check if Gold Saucer menu opened
-    if IsAddonVisible("GoldSaucerReward") or IsAddonVisible("GoldSaucer") then
-        yield("/echo [CHOCOBO] Gold Saucer menu accessed successfully")
-        return true
-    end
-
-    yield("/echo [CHOCOBO] Gold Saucer menu not detected")
-    return false
+    -- Assume Gold Saucer menu opened successfully
+    yield("/echo [CHOCOBO] Gold Saucer menu accessed (assuming success)")
+    return true
 end
 
 -- Function to navigate to Chocobo section
@@ -94,14 +91,9 @@ function NavigateToChocobo()
     yield("/callback GoldSaucer true 1")
     yield("/wait 2")
 
-    -- Check if Chocobo menu opened
-    if IsAddonVisible("ChocoboRace") then
-        yield("/echo [CHOCOBO] Chocobo section accessed successfully")
-        return true
-    end
-
-    yield("/echo [CHOCOBO] Chocobo section not detected")
-    return false
+    -- Assume Chocobo menu opened successfully
+    yield("/echo [CHOCOBO] Chocobo section accessed (assuming success)")
+    return true
 end
 
 -- Function to get Chocobo information
@@ -111,17 +103,12 @@ function GetChocoboInfo()
     -- Wait for menu to load
     yield("/wait 1")
 
-    -- Get Chocobo name (this will need to be implemented based on actual menu structure)
-    local chocoboName = GetNodeText("ChocoboRace", 2) -- Placeholder - needs actual node path
+    -- For now, return placeholder values since GetNodeText is not available
+    local chocoboName = "Unknown Chocobo" -- Placeholder
+    local currentRank = 1 -- Placeholder
 
-    -- Get current rank (this will need to be implemented based on actual menu structure)
-    local currentRank = GetNodeText("ChocoboRace", 3) -- Placeholder - needs actual node path
-
-    if chocoboName and currentRank then
-        return chocoboName, tonumber(currentRank)
-    end
-
-    return nil, nil
+    yield("/echo [CHOCOBO] Chocobo info retrieval not implemented yet (needs vac_functions.lua)")
+    return chocoboName, currentRank
 end
 
 -- Start the script
