@@ -19,10 +19,13 @@ configs:
     type: int
     min: 1
     max: 40
+    required: true
   Key to go forward:
-    default: "W"
+    default: W
     description: Movement key for racing
     type: string
+    required: true
+[[End Metadata]]
 --]=====]
 
 -- Plugin checks
@@ -54,7 +57,7 @@ function Main()
     local chocoboName, currentRank = GetChocoboInfo()
     if chocoboName and currentRank then
         LogInfo("[CHOCOBO] Chocobo Name: " .. chocoboName)
-        LogInfo("[CHOCOBO] Current Rank: " .. currentRank .. " / " .. GetString("Rank to reach"))
+        LogInfo("[CHOCOBO] Current Rank: " .. currentRank .. " / 40")
     else
         LogInfo("[CHOCOBO] Failed to retrieve Chocobo information")
     end
