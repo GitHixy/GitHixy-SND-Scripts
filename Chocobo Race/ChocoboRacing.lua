@@ -201,6 +201,12 @@ local ScriptRunning = true
 -- OpenGoldSaucerMenu()
 -- Opens the Gold Saucer menu
 function OpenGoldSaucerMenu()
+    -- Check if menu is already open
+    if IsAddonVisible("GoldSaucerInfo") then
+        LogInfo("[CHOCOBO] Gold Saucer menu already open")
+        return true
+    end
+
     LogInfo("[CHOCOBO] Opening Gold Saucer menu...")
     
     yield("/goldsaucer")
@@ -243,10 +249,8 @@ function NavigateToChocoboTab()
         end)
         
         if atkSuccess and atkValue and atkValue.ValueString and tostring(atkValue.ValueString) ~= "" then
-            LogInfo("[CHOCOBO] Already in Chocobo tab, returning to General first...")
-            -- Return to General tab (callback true 0 1 116 0 0)
-            yield("/callback GoldSaucerInfo true 0 1 121 0 0")
-            yield("/wait 0.5")
+            LogInfo("[CHOCOBO] Already in Chocobo tab, staying here")
+            return true
         end
     end
     
