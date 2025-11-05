@@ -230,6 +230,27 @@ function NavigateToChocoboTab()
             return false
         end
     end
+
+    -- Check if already in Chocobo tab by reading AtkValue 6
+    -- If we can read the chocobo name, we're already in the tab
+    local success, addon = pcall(function()
+        return Addons.GetAddon("GoldSaucerInfo")
+    end)
+    
+    if success and addon then
+        local atkSuccess, atkValue = pcall(function()
+            return addon:GetAtkValue(6)
+        end)
+        
+        if atkSuccess and atkValue and atkValue.ValueString and tostring(atkValue.ValueString) ~= "" then
+            LogInfo("[CHOCOBO] Already in Chocobo tab, returning to General first...")
+            -- Return to General tab (callback true 0 1 116 0 0)
+            yield("/callback GoldSaucerInfo true 0 1 121 0 0")
+            yield("/wait 0.5")
+        end
+    end
+    
+    -- Navigate to Chocobo Racing tab
     
     yield("/callback GoldSaucerInfo true 0 1 119 0 0")
     yield("/wait 0.5")
@@ -428,7 +449,8 @@ function MainLoop()
     yield("/e [CHOCOBO-RACE] Script Started!")
     LogInfo("[CHOCOBO] Target Rank: " .. TargetRank)
     LogInfo("[CHOCOBO] Forward Key: " .. ForwardKey)
-local raceCount = 0
+
+    local raceCount = 0
     
     -- Main loop: repeat races until target rank is reached
     while ScriptRunning do
@@ -473,17 +495,38 @@ local raceCount = 0
         
         -- Wait for queue to pop and accept
         yield("/echo [CHOCOBO] Waiting for queue to pop...")
+        local queueTimeout = 0
+        local dutyAccepted = false
+        
         repeat
-            yield("/wait 1")
+            yield("/wait 0.5")
+            queueTimeout = queueTimeout + 0.5
             
             -- Check if ContentsFinderConfirm appeared (duty pop)
             if IsAddonVisible("ContentsFinderConfirm") then
                 LogInfo("[CHOCOBO] Queue popped! Accepting...")
                 yield("/callback ContentsFinderConfirm true 8")
-                yield("/wait 2")
+                yield("/wait 1")
+                dutyAccepted = true
                 break
             end
-        until false
+            
+            -- Check if we're already in the duty (YesAlready auto-accepted)
+            if GetCharacterCondition(45) then
+                yield("/echo [CHOCOBO] Duty auto-accepted (possibly by YesAlready)")
+                dutyAccepted = true
+                break
+            end
+            
+            -- Timeout after 5 minutes of waiting
+            if queueTimeout > 300 then
+                LogInfo("[CHOCOBO] ERROR: Queue timeout after 5 minutes")
+                ScriptRunning = false
+                break
+            end
+        until dutyAccepted or not ScriptRunning
+        
+        if not ScriptRunning then break end
         
         -- Wait until player is available in the duty
         local loadTimeout = 0
