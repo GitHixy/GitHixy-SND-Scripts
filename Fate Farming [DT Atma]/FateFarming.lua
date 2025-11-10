@@ -1,7 +1,7 @@
 --[=====[
 [[SND Metadata]]
 author: GitHixy (based on pot0to's 3.0.9)
-version: 3.2.3
+version: 3.2.4
 description: >-
   Fate farming script with the following features:
 
@@ -110,6 +110,10 @@ configs:
   Change instances if no FATEs?:
     default: true
     type: boolean
+  Wait for Forlorn Maiden Buff?:
+    default: true
+    description: When you have the Twist of Fate buff (from Forlorn Maidens), wait in the same zone to use it on the next FATE instead of changing zones or instances.
+    type: boolean
   Exchange bicolor gemstones for:
     default: Turali Bicolor Gemstone Voucher
     type: string
@@ -188,6 +192,11 @@ configs:
 *                                  Changelog                                   *
 ********************************************************************************
 
+    -> 3.2.4    By GitHixy.
+                Added configurable "Wait for Forlorn Maiden Buff?" option in metadata.
+                When enabled (default: true), script waits in the same zone/instance when you have Twist of Fate buff.
+                When disabled, script ignores the buff and continues with normal zone switching/instance changing behavior.
+                Provides more control over buff utilization strategy for users who prefer different farming approaches.
     -> 3.2.3    By GitHixy.
                 Fixed auto-restart functionality to properly use "/snd run" command for script restarts.
                 Improved error handling wrapper to handle SND script termination on Lua errors.
@@ -4071,7 +4080,10 @@ MaxWait                             = 10            --Max number of seconds it s
                                                         --Actual wait time will be a randomly generated number between MinWait and MaxWait.
 DownTimeWaitAtNearestAetheryte      = true         --When waiting for fates to pop, should you fly to the nearest Aetheryte and wait there?
 EnableChangeInstance = Config.Get("Change instances if no FATEs?")
-WaitIfBonusBuff = true          --Don't change instances if you have the Twist of Fate bonus buff
+WaitIfBonusBuff = Config.Get("Wait for Forlorn Maiden Buff?")      --Don't change instances if you have the Twist of Fate bonus buff
+if WaitIfBonusBuff == nil then
+    WaitIfBonusBuff = true  -- Default to true for backwards compatibility
+end
 NumberOfInstances = 2
 ShouldExchangeBicolorGemstones = Config.Get("Exchange bicolor gemstones?")
 ItemToPurchase = Config.Get("Exchange bicolor gemstones for")
