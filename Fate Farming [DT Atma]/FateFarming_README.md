@@ -1,11 +1,17 @@
 # Fate Farming Script with Dawntrail Demiatma Integration
 
-## Version: 3.2.4
+## Version: 3.2.5
 ### Author: GitHixy (based on pot0to's 3.0.9)
 
 This FATE farming script has been developed starting from pot0to's 3.0.9 logic, with significant improvements and complete integration of automatic Dawntrail Demiatma farming.
 
 ## Main Features
+
+### New in v3.2.5 - Food/Potion System Fix
+- **Improved stability**: Script no longer crashes when food or potions run out
+- **Error handling**: Uses pcall (protected call) to catch exceptions from /item commands
+- **Warning messages**: Displays clear warnings when consumables are not found or finished
+- **Continues farming**: Script keeps running indefinitely even without food/potion buffs
 
 ### New in v3.2.4 - Forlorn Maiden Buff Control
 - **Configurable buff waiting**: New "Wait for Forlorn Maiden Buff?" option in metadata

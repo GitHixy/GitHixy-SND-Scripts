@@ -1,7 +1,7 @@
 --[=====[
 [[SND Metadata]]
 author: GitHixy (based on pot0to's 3.0.9)
-version: 3.2.4
+version: 3.2.5
 description: >-
   Fate farming script with the following features:
 
@@ -192,6 +192,11 @@ configs:
 *                                  Changelog                                   *
 ********************************************************************************
 
+    -> 3.2.5    By GitHixy.
+                Fixed food and potion system to prevent script crashes when food/potion runs out.
+                Added pcall (protected call) error handling around /item commands to catch exceptions.
+                Script now displays warning messages and continues farming when food/potion is not found.
+                Food and potion checks continue to run from Ready() function as originally designed.
     -> 3.2.4    By GitHixy.
                 Added configurable "Wait for Forlorn Maiden Buff?" option in metadata.
                 When enabled (default: true), script waits in the same zone/instance when you have Twist of Fate buff.
@@ -3107,6 +3112,7 @@ function DoFate()
         WaitingForFateRewards = CurrentFate
         Dalamud.Log("[FATE] WaitingForFateRewards DoFate: "..tostring(WaitingForFateRewards.fateId))
     end
+    
     local currentClass = Player.Job
     -- switch classes (mostly for continutation fates that pop you directly into the next one)
     if CurrentFate.isBossFate and BossFatesClass ~= nil and currentClass ~= BossFatesClass.classId and not Player.IsBusy then
@@ -3937,16 +3943,43 @@ function FoodCheck()
         local hasWellFed = HasStatusId(48)
         Dalamud.Log("[FATE] Food check: Food='"..Food.."', HasWellFed="..tostring(hasWellFed))
         if not hasWellFed then
-            Dalamud.Log("[FATE] Using food: "..Food)
-            yield("/item " .. Food)
+            Dalamud.Log("[FATE] Attempting to use food: "..Food)
+            -- Use pcall to catch errors when item doesn't exist
+            local success, error = pcall(function()
+                yield("/item " .. Food)
+            end)
+            
+            if not success then
+                -- Log warning but don't stop script
+                Dalamud.Log("[FATE] WARNING: Failed to use food '"..Food.."' - "..tostring(error))
+                if Echo == "All" then
+                    yield("/echo [FATE] WARNING: Food '"..Food.."' not found or finished. Continuing without food buff.")
+                end
+            else
+                yield("/wait 1")
+            end
         end
     end
 end
 
 function PotionCheck()
     --pot usage
-    if not HasStatusId(49) and Potion ~= "" then
-        yield("/item " .. Potion)
+    if Potion ~= "" and not HasStatusId(49) then
+        Dalamud.Log("[FATE] Attempting to use potion: "..Potion)
+        -- Use pcall to catch errors when item doesn't exist
+        local success, error = pcall(function()
+            yield("/item " .. Potion)
+        end)
+        
+        if not success then
+            -- Log warning but don't stop script
+            Dalamud.Log("[FATE] WARNING: Failed to use potion '"..Potion.."' - "..tostring(error))
+            if Echo == "All" then
+                yield("/echo [FATE] WARNING: Potion '"..Potion.."' not found or finished. Continuing without potion buff.")
+            end
+        else
+            yield("/wait 1")
+        end
     end
 end
 
